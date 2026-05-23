@@ -12,6 +12,7 @@ export const xs = {
   selectedVariantIdx: 0,
 
   stage: null,
+  selectionOverlay: null,
 
   // Pool weights block is rebuilt per renderParams; outer section collapse lives in the DOM.
   poolWeightsCollapsed: new Set(),

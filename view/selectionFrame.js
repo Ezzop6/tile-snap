@@ -27,7 +27,9 @@ export function createSelectionOverlay(stageEl, stage) {
 
   function refresh() {
     const rect = tracker();
-    if (!rect) { el.hidden = true; return; }
+    // Zero-size rect = the view is hidden (display:none → getBoundingClientRect
+    // is all zeros). Treat as "nothing to show" so no stray dot appears.
+    if (!rect || rect.width <= 0 || rect.height <= 0) { el.hidden = true; return; }
     const host = stageEl.getBoundingClientRect();
     el.style.left   = (rect.left - host.left) + "px";
     el.style.top    = (rect.top  - host.top)  + "px";

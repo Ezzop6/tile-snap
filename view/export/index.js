@@ -10,6 +10,7 @@ import { runJsonExport } from "./jsonExport.js";
 import { runZipExport } from "./zipExport.js";
 import { settings } from "../../controller/storage.js";
 import { createStage } from "../stage.js";
+import { createSelectionOverlay } from "../selectionFrame.js";
 
 const EXPORT_MODE_KEY = "exportMode";
 const EXPORT_MODES = {
@@ -135,6 +136,20 @@ export function initExportPanel() {
       fitToContent: false,
       zoomOrigin:   "center",
       isActive,
+    });
+    // Shared screen-space selection frame (same as preview + debug). Tracks
+    // the selected tile's on-screen rect, so it's one thin crisp line of
+    // identical thickness everywhere instead of a per-view CSS border.
+    xs.selectionOverlay = createSelectionOverlay(stageEl, xs.stage);
+    xs.selectionOverlay.setTracker(() => {
+      const idx = state.selectedSlotIndex;
+      if (idx == null || !xs.layoutEl) return null;
+      const sel = xs.layoutEl.querySelector(
+        `.layout-tile[data-slot-index="${idx}"][data-variant-idx="${xs.selectedVariantIdx}"]`,
+      );
+      if (!sel) return null;
+      const r = sel.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
     });
   }
 }

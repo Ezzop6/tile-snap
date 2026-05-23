@@ -2,14 +2,6 @@ import { state } from "../../controller/state.js";
 import { xs, LAYOUT_TILE_DISPLAY_PX } from "./_state.js";
 import { buildSlotBlock, buildSourceBlock } from "./tile.js";
 
-function buildSelectionFrame(col, row) {
-  const frame = document.createElement("div");
-  frame.className = "tile-selection-frame";
-  frame.style.gridColumn = String(col + 1);
-  frame.style.gridRow    = String(row + 1);
-  return frame;
-}
-
 function buildPatternMarker(slot, color, col, row) {
   const arr = slot.array;
   const rows = arr.length;
@@ -39,7 +31,6 @@ export function renderLayout() {
   xs.layoutEl.dataset.direction = state.exportVariantDirection;
   const t = state.template;
 
-  const selected = state.selectedSlotIndex;
   const slotsWithVariants = t.slots
     .filter((s) => state.getExportVariantCount(s.index) > 1)
     .sort((a, b) => (a.row - b.row) || (a.col - b.col));
@@ -66,15 +57,12 @@ export function renderLayout() {
   // so the marker stays readable on any tile colour. Canvas doesn't
   // support ::after, hence the separate div.
   const slotByIdx = new Map(t.slots.map((s) => [s.index, s]));
-  const placeTile = (block, col, row, slotIdx, isSelected) => {
+  const placeTile = (block, col, row, slotIdx /* , isSelected */) => {
     block.style.gridColumn = String(col + 1);
     block.style.gridRow    = String(row + 1);
     grid.appendChild(block);
-    // Selection frame: sibling div in the same grid cell (= same trick
-    // as the pattern marker). CSS-outline-on-tile rendered inconsistently
-    // when tiles touch edge-to-edge — a real grid item with an inset
-    // border draws reliably and never gets clipped by neighbours.
-    if (isSelected) grid.appendChild(buildSelectionFrame(col, row));
+    // Selection frame is now the shared screen-space overlay (tracks the
+    // selected tile element) — see view/selectionFrame.js + index.js.
     const color = colorBySlotIdx.get(slotIdx);
     const slot  = slotByIdx.get(slotIdx);
     if (!color || !slot) return;
@@ -83,8 +71,7 @@ export function renderLayout() {
 
   for (const slot of t.slots) {
     const block = buildSlotBlock(slot, /*isVariant*/ false);
-    const isSelected = slot.index === selected && xs.selectedVariantIdx === 0;
-    placeTile(block, slot.col, slot.row, slot.index, isSelected);
+    placeTile(block, slot.col, slot.row, slot.index);
   }
 
   for (let gi = 0; gi < layout.groups.length; gi++) {
@@ -93,9 +80,8 @@ export function renderLayout() {
     const count = state.getExportVariantCount(slot.index);
     for (let v = 1; v < count; v++) {
       const block = buildSlotBlock(slot, /*isVariant*/ true, v);
-      const isSelected = slot.index === selected && xs.selectedVariantIdx === v;
       const { col, row } = variantCellInGroup(g, v - 1);
-      placeTile(block, col, row, slot.index, isSelected);
+      placeTile(block, col, row, slot.index);
     }
   }
 
@@ -109,6 +95,8 @@ export function renderLayout() {
   xs.layoutEl.appendChild(grid);
   // Re-mount so the stage transform (CSS on mounted element) survives re-renders.
   xs.stage?.setContent(grid);
+  // Reposition the shared selection overlay over the (re-created) selected tile.
+  xs.selectionOverlay?.refresh();
 }
 
 // Layout source tiles in extra rows below the atlas. Pool A first (master

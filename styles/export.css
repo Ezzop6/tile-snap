@@ -144,18 +144,9 @@
 .tile-group-marker__cell.is-on {
   background: var(--slot-group-color, #ffe600);
 }
-/* Selection frame: sibling grid item sharing the selected tile's cell.
-   Box-sizing border-box keeps the frame inside cell bounds so it never
-   bleeds onto adjacent tiles. Pointer-events off so clicks go through to
-   the tile beneath. z-index above the marker. 1px = the thinnest hairline
-   a 64px display tile can render; the shared SELECTION_FRAME_FRACTION
-   (view/selectionFrame.js) would imply ~0.44px, which browsers won't draw. */
-.tile-selection-frame {
-  pointer-events: none;
-  border: 1px solid var(--color-warn, #ffcc00);
-  box-sizing: border-box;
-  z-index: 3;
-}
+/* Selection frame is the shared screen-space overlay (.slot-selection-frame
+   in layout.css, driven by view/selectionFrame.js) — same thin crisp line as
+   preview + debug. No per-tile CSS border here anymore. */
 
 /* Variability ranges block inside the export Variability section. */
 .export-ranges {
