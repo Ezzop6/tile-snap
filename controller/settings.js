@@ -2,7 +2,6 @@ import { state }    from "./state.js";
 import { settings } from "./storage.js";
 
 const KEYS = {
-  renderMode:       "renderMode",
   mapVisible:       "mapVisible",
   renderThrottle:   "renderThrottle",
   traceVisible:     "traceVisible",
@@ -17,9 +16,6 @@ const LEGACY_KEYS = ["renderFreeze", "noiseThrottle", "waveThrottle"];
 
 // Must run before views init so sliders/radios start at the persisted value.
 export function applySettingsToState() {
-  const mode = settings.get(KEYS.renderMode);
-  if (mode === "pixel" || mode === "smooth") state.setRenderMode(mode);
-
   const mapVisible = settings.get(KEYS.mapVisible);
   if (typeof mapVisible === "boolean") state.setMapVisible(mapVisible);
 
@@ -47,9 +43,6 @@ export function applySettingsToState() {
 }
 
 export function bindSettingsListeners() {
-  state.addEventListener("render-mode:changed", () => {
-    settings.set(KEYS.renderMode, state.renderMode);
-  });
   state.addEventListener("map-visible:changed", () => {
     settings.set(KEYS.mapVisible, state.mapVisible);
   });

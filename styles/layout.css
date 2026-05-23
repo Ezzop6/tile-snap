@@ -261,41 +261,6 @@
   filter: brightness(1.1);
 }
 
-/* Render-mode toggle in the top bar. Segmented two-position control;
-   the checked radio gets the accent treatment. Native radio inputs are
-   hidden — only the wrapping label is visible. */
-.render-mode {
-  display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  font-size: var(--font-size-sm);
-}
-
-.render-mode__option {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-2);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-
-.render-mode__option + .render-mode__option {
-  border-left: 1px solid var(--color-border);
-}
-
-.render-mode__option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.render-mode__option:has(input:checked) {
-  background: var(--color-accent);
-  color: var(--color-text-strong);
-}
 
 /* Topbar throttle toggle (aria-pressed=true = throttling ON). */
 #render-throttle-toggle {
@@ -667,7 +632,6 @@ body.map-hidden .map-overlay { display: none !important; }
    target resolution there, so there's no scaling artifact to worry
    about. */
 .render-pixel  { image-rendering: pixelated; }
-.render-smooth { image-rendering: auto; }
 
 
 /* --- Split.js gutters --------------------------------------------------- */

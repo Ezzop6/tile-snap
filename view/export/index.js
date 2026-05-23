@@ -72,7 +72,6 @@ export function initExportPanel() {
   if (xs.previewEl) {
     new ResizeObserver(() => { if (isActive()) renderPreview(); }).observe(xs.previewEl);
   }
-  state.addEventListener("render-mode:changed", scheduleLayoutAndPreview);
 
   initExportModeDropdown();
   initVariantsRandomModal();

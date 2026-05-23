@@ -55,22 +55,6 @@ export function initProjectBar() {
     onRename:     handleRename,
   });
 
-  // Single source of truth for the render-mode body class; canvases opt in via applyRenderModeClass.
-  const modeRadios = document.querySelectorAll('input[name="render-mode"]');
-  for (const radio of modeRadios) {
-    radio.checked = radio.value === state.renderMode;
-    radio.addEventListener("change", () => {
-      if (radio.checked) state.setRenderMode(radio.value);
-    });
-  }
-  state.addEventListener("render-mode:changed", () => {
-    for (const radio of modeRadios) {
-      radio.checked = radio.value === state.renderMode;
-    }
-    syncBodyClass();
-  });
-  syncBodyClass();
-
   const throttleBtn = document.getElementById("render-throttle-toggle");
   if (throttleBtn) {
     const sync = () => throttleBtn.setAttribute("aria-pressed", String(state.renderThrottle));
@@ -86,15 +70,11 @@ function syncSaveDirtyClass() {
   btn.classList.toggle("is-dirty", state.isProjectDirty());
 }
 
-function syncBodyClass() {
-  document.body.classList.toggle("render-pixel",  state.renderMode === "pixel");
-  document.body.classList.toggle("render-smooth", state.renderMode === "smooth");
-}
-
+// Tilesets are pixel-art: every canvas upscales crisp (nearest-neighbour).
+// Kept as a helper so canvas creators have one call to opt in.
 export function applyRenderModeClass(el) {
   if (!el) return;
-  el.classList.toggle("render-pixel",  state.renderMode === "pixel");
-  el.classList.toggle("render-smooth", state.renderMode === "smooth");
+  el.classList.add("render-pixel");
 }
 
 export async function autoLoad() {

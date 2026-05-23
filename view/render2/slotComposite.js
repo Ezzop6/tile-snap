@@ -9,8 +9,8 @@ import { TEXTURE_OPS } from "./textureOps/registry.js";
 const _centerRGBCache = new WeakMap();
 
 export function drawSlotComposite(ctx, slot, graph, origin, viewSize, opts = {}) {
-  const mode = opts.mode ?? state.renderMode ?? "smooth";
-  const snap = mode === "pixel";
+  // Tilesets are pixel-art → always crisp (nearest-neighbour, snapped).
+  const snap = true;
   const sourceARef = opts.sourceARef ?? resolvePoolRef(slot, "A");
   const sourceBRef = opts.sourceBRef ?? resolvePoolRef(slot, "B");
 

@@ -34,8 +34,8 @@ export function renderTemplate(canvas, opts = {}) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (transparentBg) ctx.clearRect(0, 0, widthPx, heightPx);
 
-  const mode = state.renderMode === "pixel" ? "pixel" : "smooth";
-  const snap = mode === "pixel";
+  const mode = "pixel";
+  const snap = true;
 
   for (const slot of t.slots) {
     const origin = {

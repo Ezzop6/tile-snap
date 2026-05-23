@@ -73,7 +73,7 @@ function doPaint() {
   canvasEl.style.height = h + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  ctx.imageSmoothingEnabled = state.renderMode !== "pixel";
+  ctx.imageSmoothingEnabled = false;
 
   if (viewMode === "composite") paintCompositeView(w, h);
   else                          paintTileGrid(w, h);

@@ -34,18 +34,8 @@
       <button class="mode-tab" id="mode-debug"    type="button" role="tab" title="PointGraph abstraction debug view (new pipeline, no textures).">Debug</button>
     </div>
 
-    <!-- Right: render mode + noise throttle toggle + project seed shortcut. -->
+    <!-- Right: noise throttle toggle + project seed shortcut. -->
     <div class="topbar__group">
-      <div class="render-mode" role="radiogroup" aria-label="Render mode">
-        <label class="render-mode__option">
-          <input type="radio" name="render-mode" value="pixel" checked>
-          <span>Pixel</span>
-        </label>
-        <label class="render-mode__option">
-          <input type="radio" name="render-mode" value="smooth">
-          <span>Smooth</span>
-        </label>
-      </div>
       <input class="topbar__seed-input" id="project-seed" type="number" min="0" max="99999" step="1" value="42" title="Project seed (drives noise + variants)">
       <button class="topbar__toggle" id="project-seed-random" type="button" title="Randomize project seed">🎲</button>
       <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Cap the heavy ops (noise + wave) at ~5x/sec during slider drag (default). Toggle off for live updates — smoother visual at the cost of drag responsiveness.">Throttle rendering</button>

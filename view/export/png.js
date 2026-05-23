@@ -30,10 +30,10 @@ export async function buildExportCanvas() {
   const slotSize = state.exportSlotSize;
   const filename = sanitizeFilename(state.projectName) || "tileset";
   const t = state.template;
-  const isSmooth = state.renderMode === "smooth";
 
-  const renderScale = isSmooth ? 2 : 1;
-  const internalSlot = slotSize * renderScale;
+  // Pixel-art tilesets render crisp at native resolution — no supersample.
+  const renderScale = 1;
+  const internalSlot = slotSize;
 
   // Sort order must match renderLayout() so on-screen preview maps 1:1 to PNG.
   const slotsWithVariants = t.slots
@@ -55,8 +55,7 @@ export async function buildExportCanvas() {
   out.width  = outCols * slotSize;
   out.height = (outRows + sourceLayout.totalRows) * slotSize;
   const ctx = out.getContext("2d");
-  ctx.imageSmoothingEnabled = isSmooth;
-  if (isSmooth) ctx.imageSmoothingQuality = "high";
+  ctx.imageSmoothingEnabled = false;
 
   // Honour the "Islands" toggle: when off, the editor previews show clean
   // cuts without noise — PNG export should match that. Variants' own noise

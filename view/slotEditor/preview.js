@@ -13,8 +13,7 @@ const MAX_SIZE = 480;
 export function drawPreviewBase(ctx, slot, origin, size) {
   drawCellPattern(ctx, slot, origin, size);
   const graph = buildSlotGraph(slot);
-  const snap = state.renderMode === "pixel";
-  drawCutStroke(ctx, graph, origin, size, { snap });
+  drawCutStroke(ctx, graph, origin, size, { snap: true });
 }
 
 export function syncMeta(slot) {

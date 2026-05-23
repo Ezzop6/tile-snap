@@ -43,7 +43,6 @@ export function initSlotEditor() {
   state.addEventListener("pools:changed",              gatedRebuild);
   state.addEventListener("slot-pool-override:changed", gatedRebuild);
   state.addEventListener("global-curve:changed",       gatedPaint);
-  state.addEventListener("render-mode:changed",        gatedPaint);
   state.addEventListener("noise:changed",              gatedPaint);
   state.addEventListener("seed:changed",               gatedPaint);
   state.addEventListener("tile-offsets:changed",       gatedPaint);

@@ -38,13 +38,12 @@ export function drawTileInto(ctx, slot, isVariant, variantIdx, origin, size) {
       return state.master(key);
     };
     drawSlotComposite(ctx, slot, graph, origin, size, {
-      mode:        state.renderMode,
       sourceARef:  pickSide("A"),
       sourceBRef:  pickSide("B"),
     });
-    drawOutline(ctx, graph, origin, size, { snap: state.renderMode === "pixel" });
+    drawOutline(ctx, graph, origin, size, { snap: true });
   } else {
-    drawCutStroke(ctx, graph, origin, size, { snap: state.renderMode === "pixel" });
+    drawCutStroke(ctx, graph, origin, size, { snap: true });
   }
 }
 

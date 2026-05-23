@@ -86,7 +86,6 @@ export function initMainView() {
   state.addEventListener("slot-cut-transform:changed", gated);
   state.addEventListener("slot-texture-transform:changed", gated);
   state.addEventListener("texture-ops:changed", gated);
-  state.addEventListener("render-mode:changed",        gated);
   state.addEventListener("noise:changed",              gated);
   state.addEventListener("seed:changed",               gated);
   state.addEventListener("export-resolution:changed",  gated);
@@ -108,8 +107,8 @@ function refresh() {
   if (!canvas || !t) return;
   applyRenderModeClass(canvas);
 
-  const mode = state.renderMode === "pixel" ? "pixel" : "smooth";
-  const snap = mode === "pixel";
+  const mode = "pixel";
+  const snap = true;
 
   // Unified render+export resolution (set in the Sources header). Preview and
   // export render at the same size → pixel-identical. exportSlotSize = the

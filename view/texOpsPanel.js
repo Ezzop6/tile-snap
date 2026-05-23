@@ -47,7 +47,6 @@ export function initTexOpsPanel() {
   state.addEventListener("slot-cut-transform:changed",  paintPreview);
   state.addEventListener("slot-texture-transform:changed", paintPreview);
   state.addEventListener("texture-ops:changed",         paintPreview);
-  state.addEventListener("render-mode:changed",         paintPreview);
 
   paintPreview();
 }

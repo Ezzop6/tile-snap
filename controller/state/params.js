@@ -10,7 +10,6 @@ export function initParamsState(state) {
   // view/render2/textureOps/registry.js — single source of truth that
   // drives state defaults, slotComposite chain, and texOpsPanel UI.
   state._globalTextureOps = { A: buildOpDefaults(), B: buildOpDefaults() };
-  state._renderMode = "pixel";
   state._mapVisible = true;
   state._seed = DEFAULT_SEED;
   // Global throttle for the heavy ops (noise + wave). ON (default) caps each
@@ -132,17 +131,6 @@ export function applyParamsMixin(StateClass) {
     if (this._traceRecording === b) return;
     this._traceRecording = b;
     this.dispatchEvent(new CustomEvent("trace-recording:changed", { detail: b }));
-  };
-
-  Object.defineProperty(StateClass.prototype, "renderMode", {
-    get() { return this._renderMode; },
-  });
-
-  StateClass.prototype.setRenderMode = function (mode) {
-    if (mode !== "pixel" && mode !== "smooth") return;
-    if (this._renderMode === mode) return;
-    this._renderMode = mode;
-    this.dispatchEvent(new CustomEvent("render-mode:changed", { detail: mode }));
   };
 
   Object.defineProperty(StateClass.prototype, "mapVisible", {

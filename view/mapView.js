@@ -47,7 +47,6 @@ export function initMapView() {
   state.addEventListener("slot-cut-transform:changed", gated);
   state.addEventListener("slot-texture-transform:changed", gated);
   state.addEventListener("texture-ops:changed", gated);
-  state.addEventListener("render-mode:changed", gated);
   state.addEventListener("noise:changed", gated);
   state.addEventListener("seed:changed", gated);
 
@@ -86,7 +85,7 @@ function refresh() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, widthPx, heightPx);
 
-  const snap = state.renderMode === "pixel";
+  const snap = true;
   const selectedIdx = state.selectedSlotIndex;
   for (const slot of t.slots) {
     const origin = {
