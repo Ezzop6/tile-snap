@@ -1,0 +1,6 @@
+scrap.txt
+scrap.md
+
+# release build output + transient build artifact
+dist/
+.build-entry.css

@@ -732,6 +732,11 @@ tools/tileset_generator/
 │   ├── bundle.css             — Bundle mode (stage, cards, coverage matrix, project picker,
 │   │                            overrides, progress overlay)
 │   └── export.css             — Export mode (layout grid, preview, selection frame, variability)
+├── build.sh                   — opt-in DISTRIBUTION build → dist/ (bundle/minify/obfuscate via
+│                                esbuild + javascript-obfuscator + html-minifier-terser, npx-only,
+│                                no package.json). NOT part of dev/run. OBFUSCATE=none|light|heavy.
+├── Makefile                   — distribution build targets: build(=light) / build-min / build-light /
+│                                build-heavy / serve (:8000) / clean. Wraps build.sh.
 ├── AGENTS.md                  — currently-valid spec (this file). Changes only on user confirm.
 ├── AGENTS_LOG.md              — archived status log + landing for new entries
 ├── info.md                    — original spec / pipeline notes
@@ -1104,7 +1109,21 @@ plynulý, s nimi se zasekává.
 
 ## Konvence pro tenhle nástroj
 
-- **Žádný build step.** Pokud někdy přibude, je to červená vlajka.
+- **Žádný build step pro vývoj/běh.** `index.html` se otevírá přímo, žádná
+  kompilace není potřeba k vývoji ani spuštění. Pokud do DEV workflow někdy
+  přibude build (= kompilace nutná k běhu), je to červená vlajka.
+  - **Výjimka — distribuční build (`make build`):** opt-in release krok čistě
+    pro snadnější přenositelnost, **netýká se vývoje**. `build.sh` + `Makefile`
+    bundlují + minifikují + lehce obfuskují do `dist/` (3 soubory:
+    `index.html` + `app.<hash>.js` + `app.<hash>.css`). JS+CSS přes esbuild,
+    HTML přes html-minifier-terser, JS obfuskace (default `light` = mangled
+    názvy + base64 string-array) přes javascript-obfuscator. **Vendor zůstává
+    z CDN** (Split/paper/simplex/clipper/JSZip), nebundluje se. Nástroje se
+    tahají přes `npx` + cache — **žádný `package.json`, žádné `node_modules`
+    v repu**, dev zůstává build-free. `dist/` je gitignored. Targets:
+    `build` (=light) / `build-min` / `build-light` / `build-heavy` /
+    `serve` (lokální http na :8000) / `clean`. Úroveň obfuskace = env
+    `OBFUSCATE=none|light|heavy` v `build.sh`.
 - **Žádný framework** (React/Vue/Svelte). Vanilla + Paper.js + Tweakpane.
 - **Core = pure functions.** Pokud něco v `core/*` sahá na DOM nebo globální state, je to bug.
 - **Cross-modul komunikace přes StateController events**, ne přímé volání.
