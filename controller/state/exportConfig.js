@@ -5,6 +5,9 @@ export function initExportConfigState(state) {
   state._exportTargetAspect = 1.0;
   state._exportVariability = 0.1;
   state._exportShowIslands = true;
+  // Coloured group markers on slots that have variants (+ their variant tiles).
+  // App-wide UI pref (persisted via settings, NOT the project blob).
+  state._exportShowGroups = true;
   state._exportLayoutView = "textures";
   state._exportIncludeSourceA = false;
   state._exportIncludeSourceB = false;
@@ -143,6 +146,17 @@ export function applyExportConfigMixin(StateClass) {
     if (v === this._exportShowIslands) return;
     this._exportShowIslands = v;
     this.dispatchEvent(new CustomEvent("export-show-islands:changed", { detail: v }));
+  };
+
+  Object.defineProperty(StateClass.prototype, "exportShowGroups", {
+    get() { return this._exportShowGroups; },
+  });
+
+  StateClass.prototype.setExportShowGroups = function (value) {
+    const v = !!value;
+    if (v === this._exportShowGroups) return;
+    this._exportShowGroups = v;
+    this.dispatchEvent(new CustomEvent("export-show-groups:changed", { detail: v }));
   };
 
   Object.defineProperty(StateClass.prototype, "exportLayoutView", {

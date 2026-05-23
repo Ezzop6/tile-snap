@@ -72,6 +72,10 @@ export function renderParams() {
           <input type="checkbox" id="export-show-islands" ${state.exportShowIslands ? "checked" : ""}>
           <span>Islands</span>
         </label>
+        <label class="export-view-row__opt" title="Coloured group markers on slots that have variants (and their variant tiles)">
+          <input type="checkbox" id="export-show-groups" ${state.exportShowGroups ? "checked" : ""}>
+          <span>Groups</span>
+        </label>
       </div>
     </div>
     <div class="curve-panel__field export-view-row" title="Append the pool's source tiles (master + every variant) as extra rows below the atlas. Pool A bundle goes in as plain atlas tiles (no terrain). Pool B bundle gets terrain assignment so Godot's autotile picker can use it as Terrain 1 interior tiles.">
@@ -129,6 +133,9 @@ export function renderParams() {
   });
   mainBody.querySelector("#export-show-islands")?.addEventListener("change", (e) => {
     state.setExportShowIslands(e.target.checked);
+  });
+  mainBody.querySelector("#export-show-groups")?.addEventListener("change", (e) => {
+    state.setExportShowGroups(e.target.checked);
   });
   mainBody.querySelector("#export-include-source-a")?.addEventListener("change", (e) => {
     state.setExportIncludeSourceA(e.target.checked);

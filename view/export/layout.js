@@ -63,6 +63,7 @@ export function renderLayout() {
     grid.appendChild(block);
     // Selection frame is now the shared screen-space overlay (tracks the
     // selected tile element) — see view/selectionFrame.js + index.js.
+    if (!state.exportShowGroups) return;
     const color = colorBySlotIdx.get(slotIdx);
     const slot  = slotByIdx.get(slotIdx);
     if (!color || !slot) return;

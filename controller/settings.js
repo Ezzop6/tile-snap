@@ -9,6 +9,7 @@ const KEYS = {
   traceRecording:   "traceRecording",
   bundleOverrides:  "bundleOverrides",
   bundleAtlasPath:  "bundleAtlasPath",
+  exportShowGroups: "exportShowGroups",
   lastProjectId:    "lastProjectId",
 };
 
@@ -37,6 +38,9 @@ export function applySettingsToState() {
   const bundleAtlasPath = settings.get(KEYS.bundleAtlasPath);
   if (typeof bundleAtlasPath === "string") state.loadBundleAtlasPath(bundleAtlasPath);
 
+  const showGroups = settings.get(KEYS.exportShowGroups);
+  if (typeof showGroups === "boolean") state.setExportShowGroups(showGroups);
+
   for (const k of LEGACY_KEYS) settings.remove(k);
   // Last release stored both flags under a single `tracing` key.
   settings.remove("tracing");
@@ -63,6 +67,9 @@ export function bindSettingsListeners() {
   });
   state.addEventListener("bundle-path:changed", () => {
     settings.set(KEYS.bundleAtlasPath, state.bundleAtlasPath);
+  });
+  state.addEventListener("export-show-groups:changed", () => {
+    settings.set(KEYS.exportShowGroups, state.exportShowGroups);
   });
 }
 

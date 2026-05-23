@@ -93,6 +93,7 @@ export function initExportPanel() {
   state.addEventListener("export-aspect:changed",      scheduleLayoutOnly);
   state.addEventListener("export-variability:changed", () => { if (isActive()) { rerenderRanges(); renderPreview(); } });
   state.addEventListener("export-show-islands:changed", scheduleLayoutAndPreview);
+  state.addEventListener("export-show-groups:changed", scheduleLayoutOnly);
   state.addEventListener("export-layout-view:changed", scheduleLayoutAndPreview);
   state.addEventListener("export-include-sources:changed", scheduleLayoutAndPreview);
   state.addEventListener("seed:changed",               scheduleLayoutAndPreview);
