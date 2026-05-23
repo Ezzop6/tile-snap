@@ -4,6 +4,9 @@ export function initTemplateState(state) {
   state._tileOffsets = new Map(); // Map<slotIndex, Record<pointKey, {dx,dy}>>
   state._cutBowOverrides = new Map(); // Map<slotIndex, Record<connId, bowProportion>>
   state._slotCutTransform = new Map(); // Map<slotIndex, {rotate, flipH}>
+  // Per-variant CUT transform override. Map<slotIndex, Map<variantIdx, {rotate,flipH}>>.
+  // Absent variant entry = inherit the slot's (master) cut transform.
+  state._variantCutTransform = new Map();
   state._slotTextureTransform = new Map(); // Map<slotIndex, {rotate, flipH}>
   state._templateDirty = false;
 }
@@ -35,6 +38,7 @@ export function applyTemplateMixin(StateClass) {
     this.clearAllTileOffsets();
     this.clearAllCutBowOverrides();
     this.clearAllSlotCutTransforms();
+    this.clearAllVariantCutTransforms();
     this.clearAllSlotTextureTransforms();
     this.clearAllExportConfig();
     this.clearAllSlotPoolOverrides();
@@ -216,6 +220,55 @@ export function applyTemplateMixin(StateClass) {
     this.dispatchEvent(new CustomEvent("slot-cut-transform:changed", { detail: null }));
   };
 
+  // Per-variant CUT transform. null = inherit master (getSlotCutTransform).
+  // Symmetry gating is identical to master (depends only on slot.array, which
+  // variants share). Stored as an ABSOLUTE D4; storing a value that equals the
+  // master clears the override so the variant just inherits — keeps it clean
+  // AND still lets you force a variant to identity when the master is flipped.
+  StateClass.prototype.getVariantCutTransform = function (slotIndex, variantIdx) {
+    return this._variantCutTransform.get(slotIndex)?.get(variantIdx) || null;
+  };
+
+  // Effective transform actually rendered for a variant: its override, else master.
+  StateClass.prototype.effectiveVariantCutTransform = function (slotIndex, variantIdx) {
+    return this.getVariantCutTransform(slotIndex, variantIdx)
+      || this.getSlotCutTransform(slotIndex);
+  };
+
+  StateClass.prototype.setVariantCutTransform = function (slotIndex, variantIdx, value) {
+    if (slotIndex == null || variantIdx == null) return;
+    const rotate = value ? (((value.rotate | 0) % 4) + 4) % 4 : 0;
+    const flipH  = !!value?.flipH;
+    const master = this.getSlotCutTransform(slotIndex);
+    const matchesMaster = rotate === (((master?.rotate | 0) % 4) + 4) % 4 && flipH === !!master?.flipH;
+    let perSlot = this._variantCutTransform.get(slotIndex);
+    if (matchesMaster) {
+      if (!perSlot?.has(variantIdx)) return;
+      perSlot.delete(variantIdx);
+      if (perSlot.size === 0) this._variantCutTransform.delete(slotIndex);
+    } else {
+      const prev = perSlot?.get(variantIdx);
+      if (prev && prev.rotate === rotate && prev.flipH === flipH) return;
+      if (!perSlot) { perSlot = new Map(); this._variantCutTransform.set(slotIndex, perSlot); }
+      perSlot.set(variantIdx, { rotate, flipH });
+    }
+    this.dispatchEvent(new CustomEvent("variant-cut-transform:changed", { detail: { slotIndex, variantIdx } }));
+  };
+
+  StateClass.prototype.clearVariantCutTransform = function (slotIndex, variantIdx) {
+    const perSlot = this._variantCutTransform.get(slotIndex);
+    if (!perSlot?.has(variantIdx)) return;
+    perSlot.delete(variantIdx);
+    if (perSlot.size === 0) this._variantCutTransform.delete(slotIndex);
+    this.dispatchEvent(new CustomEvent("variant-cut-transform:changed", { detail: { slotIndex, variantIdx } }));
+  };
+
+  StateClass.prototype.clearAllVariantCutTransforms = function () {
+    if (this._variantCutTransform.size === 0) return;
+    this._variantCutTransform.clear();
+    this.dispatchEvent(new CustomEvent("variant-cut-transform:changed", { detail: null }));
+  };
+
   // Per-slot TEXTURE transform (D4), independent per pool (A and B).
   // Map<slotIdx, { A?: {rotate, flipH}, B?: {rotate, flipH} }>. No gating.
   StateClass.prototype.getSlotTextureTransform = function (slotIndex, poolKey) {
@@ -267,6 +320,7 @@ export function applyTemplateMixin(StateClass) {
     this._remapTileOffsets(remap);
     this._remapCutBowOverrides(remap);
     this._remapSlotCutTransform(remap);
+    this._remapVariantCutTransform(remap);
     this._remapSlotTextureTransform(remap);
     this._remapSlotPoolOverride(remap);
     this._remapVariantPoolOverride(remap);
@@ -301,6 +355,13 @@ export function applyTemplateMixin(StateClass) {
     if (this._slotCutTransform.size === 0) return;
     this._slotCutTransform = remapKeys(this._slotCutTransform, remap);
     this.dispatchEvent(new CustomEvent("slot-cut-transform:changed", { detail: null }));
+  };
+
+  // remapKeys rewrites the outer slot key; the inner Map<variantIdx,…> rides along.
+  StateClass.prototype._remapVariantCutTransform = function (remap) {
+    if (this._variantCutTransform.size === 0) return;
+    this._variantCutTransform = remapKeys(this._variantCutTransform, remap);
+    this.dispatchEvent(new CustomEvent("variant-cut-transform:changed", { detail: null }));
   };
 
   StateClass.prototype._remapSlotTextureTransform = function (remap) {

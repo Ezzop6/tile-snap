@@ -69,6 +69,9 @@ export function applySerializeMixin(StateClass) {
       tileOffsets: Object.fromEntries(this._tileOffsets),
       cutBowOverrides: Object.fromEntries(this._cutBowOverrides),
       slotCutTransform: Object.fromEntries(this._slotCutTransform),
+      variantCutTransform: Object.fromEntries(
+        [...this._variantCutTransform].map(([slotIdx, perSlot]) =>
+          [slotIdx, Object.fromEntries(perSlot)])),
       slotTextureTransform: Object.fromEntries(this._slotTextureTransform),
       exportConfig: Object.fromEntries(this._exportConfig),
       exportVariantDirection: this._exportVariantDirection,
@@ -115,6 +118,7 @@ export function applySerializeMixin(StateClass) {
     this._tileOffsets.clear();
     this._cutBowOverrides.clear();
     this._slotCutTransform.clear();
+    this._variantCutTransform.clear();
     this._slotTextureTransform.clear();
     this._pools = { A: [], B: [] };
     this._poolWeights = { A: [], B: [] };
@@ -242,6 +246,25 @@ export function applySerializeMixin(StateClass) {
         const flipH  = !!tx.flipH;
         if (rotate === 0 && !flipH) continue;
         this._slotCutTransform.set(slotIdx, { rotate, flipH });
+      }
+    }
+
+    if (obj.variantCutTransform && typeof obj.variantCutTransform === "object") {
+      for (const [slotIdxStr, perSlotObj] of Object.entries(obj.variantCutTransform)) {
+        const slotIdx = parseInt(slotIdxStr, 10);
+        if (Number.isNaN(slotIdx) || !perSlotObj || typeof perSlotObj !== "object") continue;
+        const perSlot = new Map();
+        for (const [vKey, tx] of Object.entries(perSlotObj)) {
+          if (!tx || typeof tx !== "object") continue;
+          // Identity is KEPT here (unlike master): a stored identity variant
+          // override means "force this variant flat while the master is flipped".
+          const rotate = (((tx.rotate | 0) % 4) + 4) % 4;
+          const flipH  = !!tx.flipH;
+          const v = parseInt(vKey, 10);
+          if (Number.isNaN(v)) continue;
+          perSlot.set(v, { rotate, flipH });
+        }
+        if (perSlot.size > 0) this._variantCutTransform.set(slotIdx, perSlot);
       }
     }
 

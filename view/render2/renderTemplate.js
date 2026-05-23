@@ -53,6 +53,9 @@ export function renderTemplate(canvas, opts = {}) {
       noiseOverride,
       includeNoise,
       includeWave,
+      // Variant override carries its effective cut transform; master pass
+      // (no ov) falls back to the slot's master transform from state.
+      ...(ov ? { cutTransform: ov.cutTransform } : {}),
     });
 
     if (showCurveDebug) {

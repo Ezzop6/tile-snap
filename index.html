@@ -467,10 +467,15 @@
            per-variant seed offset — handy when one randomly-picked tile
            looks ugly. Disabled when previewing the template (no rng). -->
       <section class="panel-section panel-section--preview" id="export-preview-section" data-mode="export" hidden>
-        <header class="panel-section__header">
-          <h2 class="panel-section__title">Preview</h2>
-          <span class="panel-section__meta" id="export-slot-meta"></span>
-          <div class="panel-section__actions stepper-row">
+        <header class="panel-section__header export-preview-header">
+          <!-- Row 1: information. -->
+          <div class="export-preview-header__row export-preview-header__info">
+            <h2 class="panel-section__title">Preview</h2>
+            <span class="panel-section__meta" id="export-slot-meta"></span>
+          </div>
+          <!-- Row 2: original per-variant transforms (pool A/B + seed steppers). -->
+          <div class="export-preview-header__row stepper-row">
+            <span class="export-preview-header__tag">variant</span>
             <div class="stepper stepper--a">
               <button class="stepper__btn" type="button" id="export-preview-a-prev" title="Cycle pool A variant (−1)" disabled>◀</button>
               <span class="stepper__label" id="export-preview-a-label">A-·</span>
@@ -487,6 +492,10 @@
               <button class="stepper__btn" type="button" id="export-preview-next" title="Reroll this variant (seed +1)" disabled>▶</button>
             </div>
           </div>
+          <!-- Row 3: new per-variant mask transform — filled by export/preview.js
+               when a variant is selected (same widget + symmetry gating as the
+               slot-editor cut row). -->
+          <div class="export-preview-header__row stepper--mask" id="export-preview-mask"></div>
         </header>
         <div class="export-preview" id="export-preview"></div>
         <div class="export-preview-controls" id="export-preview-controls">

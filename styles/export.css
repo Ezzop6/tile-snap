@@ -76,12 +76,71 @@
   padding: var(--space-3);
 }
 
-/* When previewing a variant tile, the steppers are the only thing
- * worth surfacing in the section header — hide the "Preview" title
- * and let the stepper row center itself across the full header width. */
-.panel-section.is-variant-preview .panel-section__title { display: none; }
-.panel-section.is-variant-preview .panel-section__header { justify-content: center; }
-.panel-section.is-variant-preview .panel-section__actions { margin: 0 auto; }
+/* Export preview header: a tidy three-row control stack —
+   (1) info, (2) original per-variant steppers, (3) per-variant mask transform.
+   Rows 2+3 show only while a variant is selected. Every row wraps so the
+   controls never overflow when the right panel is dragged narrow. */
+.export-preview-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.export-preview-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+.export-preview-header__info { justify-content: space-between; }
+
+/* Aligned muted tags label rows 2 + 3 so the controls line up like a form. */
+.export-preview-header__tag,
+.export-preview-header .cut-transform__label {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 44px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+/* Mask transform = the slot-editor cut widget, restyled to one compact
+   segmented pill that echoes the stepper pills (no heavy 56px label block). */
+.export-preview-header .cut-transform {
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  flex-wrap: wrap;
+}
+.export-preview-header .cut-transform__btns {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.export-preview-header .cut-transform__btn {
+  flex: 0 0 auto;
+  width: 26px;
+  min-width: 0;
+  height: 22px;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+}
+.export-preview-header .cut-transform__btn:first-child { border-left: 0; }
+.export-preview-header .cut-transform__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
 .export-preview canvas {
   display: block;
   /* Same checker as main / export / creator stages so the side

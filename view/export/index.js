@@ -97,7 +97,7 @@ export function initExportPanel() {
   state.addEventListener("export-layout-view:changed", scheduleLayoutAndPreview);
   state.addEventListener("export-include-sources:changed", scheduleLayoutAndPreview);
   state.addEventListener("seed:changed",               scheduleLayoutAndPreview);
-  for (const ev of ["pool-weights:changed", "slot-pool-override:changed", "variant-pool-override:changed", "input:added", "input:removed", "input:updated"]) {
+  for (const ev of ["pool-weights:changed", "slot-pool-override:changed", "variant-pool-override:changed", "variant-cut-transform:changed", "input:added", "input:removed", "input:updated"]) {
     state.addEventListener(ev, scheduleLayoutAndPreview);
   }
   // Full rebuild: adding/removing pool entries changes which rows the weights block shows.

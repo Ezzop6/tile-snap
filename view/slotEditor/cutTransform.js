@@ -13,21 +13,25 @@ const FLIP_BUTTONS = [
   { key: "diagNE", label: "⟋", tooltip: "Mirror across NE–SW diagonal",  op: { rotate: 1, flipH: true } },
 ];
 
-export function buildCutTransformRow(slot) {
+// Generic cut-transform control. `pattern` (= slot.array) drives the symmetry
+// gate — identical for a slot and its variants since they share the pattern.
+// read() → current {rotate,flipH}; write(next) persists an absolute {rotate,flipH}.
+// Master slot + export variants both build the SAME widget through this.
+export function buildCutTransformControl({ pattern, read, write, label = "cut" }) {
   const wrap = document.createElement("div");
   wrap.className = "cut-transform";
 
-  const label = document.createElement("span");
-  label.className = "cut-transform__label";
-  label.textContent = "cut";
-  wrap.appendChild(label);
+  const labelEl = document.createElement("span");
+  labelEl.className = "cut-transform__label";
+  labelEl.textContent = label;
+  wrap.appendChild(labelEl);
 
   const grid = document.createElement("div");
   grid.className = "cut-transform__btns";
   wrap.appendChild(grid);
 
-  const sym = getSymmetryGroup(slot?.array);
-  const cur = readTransform(slot);
+  const sym = getSymmetryGroup(pattern);
+  const cur = norm(read());
   const isAllowed = (st) => sym[opKeyFor(st)] === true;
 
   // Cycle rotate: smallest k > 0 such that current rotated by k stays in
@@ -41,7 +45,7 @@ export function buildCutTransformRow(slot) {
     : "No other valid rotation for this slot's pattern";
   rotBtn.textContent = "↻";
   if (!delta) rotBtn.disabled = true;
-  rotBtn.addEventListener("click", () => apply(slot, { rotate: delta, flipH: false }));
+  rotBtn.addEventListener("click", () => apply(read, write, { rotate: delta, flipH: false }));
   grid.appendChild(rotBtn);
 
   for (const b of FLIP_BUTTONS) {
@@ -54,27 +58,30 @@ export function buildCutTransformRow(slot) {
       btn.disabled = true;
       btn.title = b.tooltip + " — not a symmetry of this slot's pattern";
     }
-    btn.addEventListener("click", () => apply(slot, b.op));
+    btn.addEventListener("click", () => apply(read, write, b.op));
     grid.appendChild(btn);
   }
 
   return wrap;
 }
 
-function readTransform(slot) {
-  if (slot?.index == null) return { rotate: 0, flipH: false };
-  const t = state.getSlotCutTransform(slot.index);
-  return {
-    rotate: (((t?.rotate | 0) % 4) + 4) % 4,
-    flipH: !!t?.flipH,
-  };
+// Master per-slot cut transform (slot editor). Thin wrapper over the control.
+export function buildCutTransformRow(slot) {
+  return buildCutTransformControl({
+    pattern: slot?.array,
+    read:  () => state.getSlotCutTransform(slot?.index),
+    write: (next) => { if (slot?.index != null) state.setSlotCutTransform(slot.index, next); },
+  });
 }
 
-function apply(slot, op) {
-  if (slot?.index == null) return;
+function norm(t) {
+  return { rotate: (((t?.rotate | 0) % 4) + 4) % 4, flipH: !!t?.flipH };
+}
+
+function apply(read, write, op) {
   if (op.rotate === 0 && !op.flipH) return; // no-op identity op
-  const next = composeD4(readTransform(slot), op);
-  state.setSlotCutTransform(slot.index, next);
+  const next = composeD4(norm(read()), op);
+  write(next);
 }
 
 // Map a D4 state to its symmetry-group key for gating lookups.

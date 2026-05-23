@@ -72,7 +72,8 @@ function optsAreCacheable(opts) {
     && !opts.noiseOverride
     && opts.includeNoise === undefined
     && opts.includeWave === undefined
-    && !opts.stopBeforeWave;
+    && !opts.stopBeforeWave
+    && !("cutTransform" in opts);
 }
 
 export function buildSlotGraph(slot, opts = {}) {
@@ -93,7 +94,7 @@ export function buildSlotGraph(slot, opts = {}) {
   ));
   timed("curve:tileOffsets", () => applyTileOffsets(graph, slot));
   applyOps(graph, slot, opts);
-  timed("curve:cutTransform", () => applySlotCutTransform(graph, slot));
+  timed("curve:cutTransform", () => applySlotCutTransform(graph, slot, opts));
   if (cacheable) {
     _slotGraphCache.set(slot, graph);
   }
@@ -320,8 +321,13 @@ function applyOps(graph, slot, opts = {}) {
 // handle and bow graphs also get the transform applied — drag handles
 // render on the transformed cut. Identity (missing entry, or rotate=0 +
 // flipH=false) is a no-op inside cutTransform itself.
-function applySlotCutTransform(graph, slot) {
+// opts.cutTransform (present even when null) overrides the slot's master
+// transform — export variants pass their effective transform here. Absent =
+// read the master from state (preview/master tile, handle/bow graphs).
+function applySlotCutTransform(graph, slot, opts = {}) {
   if (slot?.index == null) return;
-  const cutTx = state.getSlotCutTransform(slot.index);
+  const cutTx = ("cutTransform" in opts)
+    ? opts.cutTransform
+    : state.getSlotCutTransform(slot.index);
   if (cutTx) cutTransform(graph, cutTx);
 }

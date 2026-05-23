@@ -36,6 +36,9 @@ export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
   const graph = buildSlotGraph(slot, {
     curveOverride: ov?.curve || null,
     noiseOverride,
+    // Variant pass passes its effective cut transform (variant ?? master);
+    // master tile (ov null) lets buildSlotGraph read the master from state.
+    ...(ov ? { cutTransform: ov.cutTransform } : {}),
   });
 
   if (state.exportLayoutView === "textures") {
@@ -95,7 +98,7 @@ export function applyPoolTextureOps(srcCanvas, poolKey) {
 export function buildVariantOverride(slotIndex, variantIdx) {
   const offset = state.getVariantSeedOffset(slotIndex, variantIdx);
   const rng = variantRng(state.seed, slotIndex, variantIdx, offset);
-  const overrides = { curve: {}, noise: {}, sources: {} };
+  const overrides = { curve: {}, noise: {}, sources: {}, cutTransform: null };
   let hasAny = false;
   for (const param of VARIANT_PARAMS) {
     const range = state.getExportRange(slotIndex, param.key);
@@ -123,6 +126,10 @@ export function buildVariantOverride(slotIndex, variantIdx) {
     overrides.sources[key] = ref;
     if (ref) hasAny = true;
   }
+  // Effective cut transform = this variant's override, else the master's.
+  // An explicit per-variant mirror alone is enough to materialise the override.
+  overrides.cutTransform = state.effectiveVariantCutTransform(slotIndex, variantIdx);
+  if (state.getVariantCutTransform(slotIndex, variantIdx)) hasAny = true;
   return hasAny ? overrides : null;
 }
 

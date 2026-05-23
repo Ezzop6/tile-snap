@@ -1,6 +1,7 @@
 import { state } from "../../controller/state.js";
 import { xs, PREVIEW_MIN_PX } from "./_state.js";
 import { buildSlotBlock } from "./tile.js";
+import { buildCutTransformControl } from "../slotEditor/cutTransform.js";
 
 export function renderPreview() {
   if (!xs.previewEl) return;
@@ -10,10 +11,10 @@ export function renderPreview() {
     : null;
   if (!slot) {
     xs.previewEl.innerHTML = `<p class="placeholder">Click a slot to preview it.</p>`;
-    for (const cls of ["stepper--a", "stepper--b", "stepper--seed"]) {
-      const el = document.querySelector(`.${cls}`);
-      if (el) el.style.display = "none";
-    }
+    const stepperRow = document.querySelector(".export-preview-header .stepper-row");
+    if (stepperRow) stepperRow.style.display = "none";
+    const maskRow = document.getElementById("export-preview-mask");
+    if (maskRow) { maskRow.style.display = "none"; maskRow.innerHTML = ""; }
     xs.previewEl.closest(".panel-section")?.classList.remove("is-variant-preview");
     return;
   }
@@ -34,10 +35,25 @@ export function renderPreview() {
   xs.previewEl.innerHTML = "";
   xs.previewEl.appendChild(canvas);
 
-  // Steppers are variant-only: V=0 mirrors the slot-editor pin and is read-only.
-  for (const cls of ["stepper--a", "stepper--b", "stepper--seed"]) {
-    const el = document.querySelector(`.${cls}`);
-    if (el) el.style.display = isVariant ? "" : "none";
+  // Rows 2 (steppers) + 3 (mask) are variant-only — V=0 mirrors the slot-editor
+  // pin and is read-only, so collapse both rows entirely for the master tile.
+  const stepperRow = document.querySelector(".export-preview-header .stepper-row");
+  if (stepperRow) stepperRow.style.display = isVariant ? "" : "none";
+  const maskRow = document.getElementById("export-preview-mask");
+  if (maskRow) {
+    maskRow.style.display = isVariant ? "" : "none";
+    // (Re)build the per-variant mask transform — same widget + symmetry gating
+    // as the slot-editor cut row, writing to this variant. Effective value
+    // inherits the master when the variant has no explicit override.
+    maskRow.innerHTML = "";
+    if (isVariant) {
+      maskRow.appendChild(buildCutTransformControl({
+        pattern: slot.array,
+        label:   "mask",
+        read:  () => state.effectiveVariantCutTransform(slot.index, xs.selectedVariantIdx),
+        write: (next) => state.setVariantCutTransform(slot.index, xs.selectedVariantIdx, next),
+      }));
+    }
   }
   xs.previewEl.closest(".panel-section")?.classList.toggle("is-variant-preview", isVariant);
   if (isVariant) {

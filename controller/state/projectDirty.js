@@ -19,6 +19,7 @@ const MUTATION_EVENTS = [
   "seed:changed",
   "tile-offsets:changed",
   "slot-cut-transform:changed",
+  "variant-cut-transform:changed",
   "slot-texture-transform:changed",
   "project-name:changed",
   "export-config:changed",
