@@ -1,4 +1,5 @@
-import { buildNoiseMask } from "../../../noise.js";
+import { buildNoiseMask, applyCutFade } from "../../../noise.js";
+import { timed } from "../../../trace.js";
 
 const MIN_LOOP_VERTICES = 3;
 
@@ -24,10 +25,19 @@ export function noiseImpl(graph, opts = {}) {
   );
 
   // Constrain raw noise islands to the current cut region (holes inside filled,
-  // patches inside empty). Edge fade is NOT done here — it's a composition
-  // concern handled in the merge op, which actually has the cut-mask geometry.
+  // patches inside empty).
   const wantInside = params.side === "holes";
   preMaskByCutRegion(mask, collectBoundarySegments(graph), wantInside);
+
+  // Edge fade: pull noise back from the cut TRANSITION by params.edgeFade — a
+  // cheap raster cutoff on the mask (cut-only segments, so deep interior + the
+  // slot-edge margin stay untouched). Replaces the old composition-level band +
+  // Paper boolean (~800 ms/layer) with an O(on-cells × cut-segments) pass.
+  if (params.edgeFade > 0) {
+    const cols = Math.max(1, graph.meta.cols || 1);
+    const fadePx = params.edgeFade * (size / cols);
+    timed(`noiseFade:${params.side}`, () => applyCutFade(mask, collectCutSegments(graph), fadePx));
+  }
 
   const loops = traceLoops(mask);
   if (!loops.length) return graph;
@@ -71,6 +81,28 @@ function collectBoundarySegments(graph) {
     } else {
       if (conn.role !== "cut" && conn.role !== "closure") continue;
     }
+    const a = graph.points.get(conn.from);
+    const b = graph.points.get(conn.to);
+    if (!a || !b) continue;
+    out.push(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+  }
+  return out;
+}
+
+// Cut TRANSITION only — role "cut", excluding noise chains (closure / slot edges
+// are role "closure" so already out). Drives the edge fade so noise recedes from
+// the transition, not the tile borders. We deliberately do NOT use merged-cut
+// here: after layer A merges, merged-cut is the WHOLE region loop (transition +
+// slot edges + A's holes), so fading layer B against it would pull patches off
+// the slot edges + holes — the wrong direction. The original transition "cut"
+// connections survive the merge (merge only drops merged-cut + noise chains) and
+// the filled/empty transition isn't moved by A's holes, so it's the right
+// boundary for both layers.
+function collectCutSegments(graph) {
+  const out = [];
+  for (const conn of graph.connections.values()) {
+    if (conn.role !== "cut") continue;
+    if (typeof conn.chainId === "string" && conn.chainId.startsWith("noise_")) continue;
     const a = graph.points.get(conn.from);
     const b = graph.points.get(conn.to);
     if (!a || !b) continue;

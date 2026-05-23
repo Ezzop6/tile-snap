@@ -1,6 +1,6 @@
 import { state } from "../../controller/state.js";
 import { applyRenderModeClass } from "../projectBar.js";
-import { gateRefreshDuringTemplateMode } from "../viewRefreshGate.js";
+import { gateRefreshToMode } from "../viewRefreshGate.js";
 import { REFERENCE_SLOT_SIZE } from "../render2/index.js";
 import { buildPoolOverrideRow } from "./poolOverride.js";
 import { buildCutTransformRow } from "./cutTransform.js";
@@ -28,8 +28,8 @@ export function initSlotEditor() {
   // Paint = canvas blit; rAF-coalesce so burst events (curve "Random all",
   // bundle export deserialize loop) collapse into one paint per frame.
   // Rebuild = DOM structure change, lighter listener set → left sync.
-  const gatedRebuild = gateRefreshDuringTemplateMode(rebuild);
-  const gatedPaint   = coalesceRaf(gateRefreshDuringTemplateMode(paint));
+  const gatedRebuild = gateRefreshToMode(rebuild, "preview");
+  const gatedPaint   = coalesceRaf(gateRefreshToMode(paint, "preview"));
   state.addEventListener("slot-selection:changed",     gatedRebuild);
   state.addEventListener("template:changed",           gatedRebuild);
   state.addEventListener("pools:changed",              gatedRebuild);

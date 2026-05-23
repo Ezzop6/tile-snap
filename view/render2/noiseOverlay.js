@@ -9,7 +9,7 @@
 // neighbouring slots at any non-1x zoom; using REF here is the fix.
 
 import { state } from "../../controller/state.js";
-import { buildNoiseMask } from "../../core/noise.js";
+import { buildNoiseMask, applyCutFade } from "../../core/noise.js";
 import { withSlotTransform } from "./viewTransform.js";
 import { REFERENCE_SLOT_SIZE } from "./buildSlotGraph.js";
 
@@ -25,14 +25,15 @@ export function drawNoiseOverlay(ctx, slot, graph, origin, viewSize, shouldShow 
   const np = state.noiseParams;
   if (!np) return;
   const seed = state.seed | 0;
-  const segments = collectBoundarySegments(graph);
+  const segments    = collectBoundarySegments(graph);
+  const cutSegments = collectCutSegments(graph);
   withSlotTransform(ctx, origin, viewSize, () => {
-    drawLayer(ctx, slot, segments, np.A, "holes",   seed,        shouldShow);
-    drawLayer(ctx, slot, segments, np.B, "patches", seed + 9973, shouldShow);
+    drawLayer(ctx, slot, segments, cutSegments, np.A, "holes",   seed,        shouldShow);
+    drawLayer(ctx, slot, segments, cutSegments, np.B, "patches", seed + 9973, shouldShow);
   });
 }
 
-function drawLayer(ctx, slot, segments, layer, side, seed, shouldShow) {
+function drawLayer(ctx, slot, segments, cutSegments, layer, side, seed, shouldShow) {
   if (!layer?.enabled) return;
   if (!shouldShow(side)) return;
   const color = NOISE_OVERLAY_COLORS[side];
@@ -43,9 +44,12 @@ function drawLayer(ctx, slot, segments, layer, side, seed, shouldShow) {
     layer,
     seed,
   );
-  // Edge fade is now a composition step (merge op) on the vector cut, not a
-  // mask pass — so this tint shows the RAW noise region; the actual faded-back
-  // result is what slotComposite renders. (Overlay = approximate debug aid.)
+  // Mirror the noise op's edge fade (core/noise.js#applyCutFade) so this tint
+  // matches what slotComposite actually renders.
+  if (layer.edgeFade > 0) {
+    const cols = Math.max(1, slot.array?.[0]?.length || 1);
+    applyCutFade(mask, cutSegments, layer.edgeFade * (REFERENCE_SLOT_SIZE / cols));
+  }
   const wantInside = side === "holes";
   ctx.save();
   ctx.fillStyle = color;
@@ -68,6 +72,21 @@ function collectBoundarySegments(graph) {
   const out = [];
   for (const conn of graph.connections.values()) {
     if (conn.role !== "cut" && conn.role !== "closure") continue;
+    const a = graph.points.get(conn.from);
+    const b = graph.points.get(conn.to);
+    if (!a || !b) continue;
+    out.push(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+  }
+  return out;
+}
+
+// Cut TRANSITION only (no closure / slot edges, no noise chains) — drives the
+// edge-fade preview to match the noise op.
+function collectCutSegments(graph) {
+  const out = [];
+  for (const conn of graph.connections.values()) {
+    if (conn.role !== "cut") continue;
+    if (typeof conn.chainId === "string" && conn.chainId.startsWith("noise_")) continue;
     const a = graph.points.get(conn.from);
     const b = graph.points.get(conn.to);
     if (!a || !b) continue;

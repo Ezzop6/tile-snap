@@ -8,7 +8,7 @@ import { applyRenderModeClass } from "./projectBar.js";
 import { createStage } from "./stage.js";
 import { sharedTransform } from "./sharedTransform.js";
 import { getMode, onModeChange } from "./modeTabs.js";
-import { gateRefreshDuringTemplateMode } from "./viewRefreshGate.js";
+import { gateRefreshToMode } from "./viewRefreshGate.js";
 import {
   buildSlotGraph,
   drawSlotComposite,
@@ -75,7 +75,7 @@ export function initMainView() {
   // Refresh is then rAF-coalesced so N event dispatches in one tick
   // (random-all, bundle export deserialize loop, etc.) yield a single
   // paint at the next frame instead of N sequential full re-renders.
-  const gated = coalesceRaf(gateRefreshDuringTemplateMode(refresh));
+  const gated = coalesceRaf(gateRefreshToMode(refresh, "preview"));
   state.addEventListener("template:changed",           gated);
   state.addEventListener("pools:changed",              gated);
   state.addEventListener("slot-pool-override:changed", gated);

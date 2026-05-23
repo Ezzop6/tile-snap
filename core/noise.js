@@ -1,4 +1,5 @@
 import { scaleToPeriodPx } from "./noise_params.js";
+import { minDistanceToSegments } from "./geometry.js";
 
 const SAMPLE_PX = 2;
 
@@ -140,5 +141,25 @@ export function buildNoiseMask(slotCol, slotRow, origin, size, params, seed) {
   }
 
   return { cols, rows, data, cell: SAMPLE_PX, origin };
+}
+
+// Hard edge fade on the noise mask: zero every "on" cell within `fadePx` of any
+// segment in `segments` (the cut TRANSITION). A cheap raster pass —
+// O(on-cells × segments) — that replaces the old vector band + Paper boolean
+// (which cost ~800 ms/layer). Once the mask is traced, surviving islands have a
+// clean offset edge fadePx back from the cut; deep interior / tile middle /
+// slot-edge margin stay untouched (segments are cut-only, not closure).
+export function applyCutFade(mask, segments, fadePx) {
+  if (!fadePx || fadePx <= 0 || !segments?.length) return;
+  const { cols, rows, data, cell, origin } = mask;
+  for (let r = 0; r < rows; r++) {
+    const py = origin.y + r * cell + cell * 0.5;
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      if (!data[idx]) continue;
+      const px = origin.x + c * cell + cell * 0.5;
+      if (minDistanceToSegments(segments, px, py) < fadePx) data[idx] = 0;
+    }
+  }
 }
 

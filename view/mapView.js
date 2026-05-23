@@ -4,7 +4,7 @@
 // yellow frame.
 
 import { state } from "../controller/state.js";
-import { gateRefreshDuringTemplateMode } from "./viewRefreshGate.js";
+import { gateRefreshToMode } from "./viewRefreshGate.js";
 import {
   buildSlotGraph,
   drawCellPattern,
@@ -36,7 +36,7 @@ export function initMapView() {
 
   // rAF-coalesce so burst events (curve "Random all", bundle export
   // deserialize loop) collapse into one minimap repaint per frame.
-  const gated = coalesceRaf(gateRefreshDuringTemplateMode(refresh));
+  const gated = coalesceRaf(gateRefreshToMode(refresh, "preview"));
   state.addEventListener("template:changed", gated);
   state.addEventListener("pools:changed", gated);
   state.addEventListener("slot-pool-override:changed", gated);

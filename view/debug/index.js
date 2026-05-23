@@ -5,6 +5,7 @@ import { buildSlotGraph } from "../render2/buildSlotGraph.js";
 import { createStage } from "../stage.js";
 import { sharedTransform } from "../sharedTransform.js";
 import { createSelectionOverlay, slotClientRect } from "../selectionFrame.js";
+import { coalesceRaf } from "../raf.js";
 import {
   isAspectActive, getActiveAspects, onAspectsChange, setCopyHandler,
 } from "../debugPanel.js";
@@ -57,7 +58,10 @@ export function initDebugMode() {
   });
 
   onModeChange((mode) => { if (mode === "debug") render(); });
-  const repaint        = () => { if (isActive()) render(); };
+  // rAF-coalesce: a slider drag fires many state events per second; without
+  // this each one synchronously re-rendered all 47 slots. Now → one render
+  // per frame. (Click still calls render() directly for instant feedback.)
+  const repaint        = coalesceRaf(() => { if (isActive()) render(); });
   const clearAndRepaint = () => { dbgState.selected = null; repaint(); };
   state.addEventListener("template:changed",               clearAndRepaint);
   state.addEventListener("tile-offsets:changed",           repaint);

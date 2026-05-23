@@ -253,7 +253,9 @@ tileset_generator/
 │   ├── source.js              — loadImageFile, splitIntoTiles. Tile canvases
 │   │                            get `willReadFrequently:true` on first getContext
 │   │                            (tresBuilder reads center pixel for swatch).
-│   ├── noise.js               — simplex/ridged/billowy/fbm/worley wrappers + buildNoiseMask + applyEdgeFade
+│   ├── noise.js               — simplex/ridged/billowy/fbm/worley wrappers + buildNoiseMask + applyCutFade
+│   │                            (mask-level edge fade: zeroes noise cells within fadePx of the cut
+│   │                            transition; cheap raster pass — replaced the old merge-side vector band)
 │   ├── random.js              — seeded RNG
 │   ├── cellValue.js           — cellOn(v): single source of truth "je buňka filled?"
 │   │                            (scalar truthy | triangle-array any-wedge). Sdílené napříč
@@ -330,6 +332,8 @@ tileset_generator/
 │           ├── noise/
 │           │   ├── index.js               — dispatcher (calls noiseImpl)
 │           │   └── impl.js                — buildNoiseMask + pre-mask by cut region (PIP) +
+│           │                                applyCutFade (edge fade: zero cells within fadePx of the
+│           │                                cut TRANSITION only — collectCutSegments, never closure) +
 │           │                                marching squares trace → new closed cut chains
 │           │                                (chainId "noise_<col>_<row>_<i>")
 │           ├── merge/
@@ -464,17 +468,18 @@ tileset_generator/
 │   │                            overlay (createSelectionOverlay z selectionFrame.js — DOM overlay, NE
 │   │                            canvas kresba). Backing size = state.exportSlotSize (unified render/export
 │   │                            rozlišení), vždy crisp (render mode pryč). Stage sdílí pan/zoom přes
-│   │                            sharedTransform. Refresh listeners wrapped via gateRefreshDuringTemplateMode
-│   │                            — paint clicks inside the template editor mark dirty + flush once on mode exit.
+│   │                            sharedTransform. Refresh listeners wrapped via gateRefreshToMode(…,"preview")
+│   │                            — only repaints in preview mode (skips when hidden in export/debug/bundle/
+│   │                            template; flushes once on return to preview).
 │   ├── mapView.js             — top-right preview overlay. drawCellPattern + drawCutStroke
 │   │                            (clean abstract: pattern + colored cut line). No debug clutter.
-│   │                            State-event listeners gated through gateRefreshDuringTemplateMode;
+│   │                            State-event listeners gated through gateRefreshToMode(…,"preview");
 │   │                            ResizeObserver stays ungated (layout can change in any mode).
-│   ├── viewRefreshGate.js     — gateRefreshDuringTemplateMode(refresh): wraps a view's refresh fn so
-│   │                            calls inside template mode mark dirty and skip; mode-change subscription
-│   │                            flushes one refresh when the user leaves template mode. Applied to
-│   │                            mainView / mapView / slotEditor. NOT for debug stage / export panel — those
-│   │                            already check their own isActive() before refreshing.
+│   ├── viewRefreshGate.js     — gateRefreshToMode(refresh, activeMode): wraps a view's refresh fn so it
+│   │                            only runs while `activeMode` is current; in any other mode it marks dirty
+│   │                            and skips (hidden views don't repaint), flushing one refresh on entering
+│   │                            activeMode. Applied to mainView / mapView / slotEditor (all "preview").
+│   │                            NOT for debug stage / export panel — those already check isActive().
 │   ├── slotEditor/            — selected-slot editor. Subdir per concept; new sections sit as
 │   │   │                        peers of poolOverride.js.
 │   │   ├── index.js           — lifecycle + DOM container + mouse event wiring + paint loop.
@@ -1076,16 +1081,17 @@ zdroje wasted compute, dohromady drží interactive drag plynulý.
   `includeNoise` / `includeWave` / `stopBeforeWave`) — ty produkují varianty
   které nejsou interchangeable s default-opts grafem.
 
-**Template-mode refresh gate (`view/viewRefreshGate.js`):**
-- `gateRefreshDuringTemplateMode(refresh)` vrací wrapper: v template módu
-  nastaví `dirty=true` a refresh přeskočí; mode-change subscription flushne
-  jeden refresh při návratu do jiného módu.
-- Aplikováno na `mainView` / `mapView` / `slotEditor` — během paint
-  v template editoru se ty hidden views nepřekreslují. Plain `template:changed`
-  burst (paint drag = 1 event per cell) by jinak rebuildoval všechny
-  47 slot graphs × 3 views per click.
-- `templateCreator` necháno bez gate (potřebuje aktualizovat editor grid).
-  debug stage + export panel necháno (mají vlastní `isActive()` guard).
+**Mode refresh gate (`view/viewRefreshGate.js`):**
+- `gateRefreshToMode(refresh, activeMode)` vrací wrapper: když `activeMode` není
+  aktivní, nastaví `dirty=true` a refresh přeskočí; mode-change subscription
+  flushne jeden refresh při vstupu do `activeMode`.
+- Aplikováno na `mainView` / `mapView` / `slotEditor` — všechny `"preview"`.
+  Hidden views se NEpřekreslují v žádném ne-preview módu (dřív jen v template).
+  Bez toho by každý `noise:changed` / `global-curve:changed` v debug/export módu
+  rebuildoval skryté preview kompozity (47 slotů × drawSlotComposite) — neviditelné
+  v trace, ale citelné na responzivitě.
+- `templateCreator` necháno bez gate. debug stage + export panel necháno (mají
+  vlastní `isActive()`; debug navíc rAF-coalesced repaint přes coalesceRaf).
   Lightweight UI sync handlery (`canvasToolbar` / `sourcePanel` / `inputsPanel`)
   necháno (DOM update, ne graph rebuild).
 
