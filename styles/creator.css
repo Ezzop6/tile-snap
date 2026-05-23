@@ -231,8 +231,16 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left: 1px solid rgba(0, 0, 0, 0.25);
-  padding-left: var(--space-1);
-  padding-right: var(--space-1);
+  /* Wider, centred glyph = a comfortable click target (was a cramped
+     space-1 sliver that was hard to hit). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  font-size: var(--font-size-md);
+  line-height: 1;
 }
 .split-button__menu {
   position: absolute;
