@@ -3,6 +3,8 @@
 // pixel in that block is HSL-shifted by it. Seed deterministic per
 // (W, H, params) so the pattern is stable across cache rebuilds.
 
+import { clamp01 } from "../../../../core/math.js";
+
 const _cache = new WeakMap();
 
 export function applyHslJitterImpl(srcCanvas, poolKey, hueJ, satJ, lightJ, scale) {
@@ -65,8 +67,6 @@ function build(srcCanvas, hueJ, satJ, lightJ, scale) {
   outCanvas.getContext("2d", { willReadFrequently: true }).putImageData(new ImageData(out, W, H), 0, 0);
   return outCanvas;
 }
-
-function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;

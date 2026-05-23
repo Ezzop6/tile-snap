@@ -5,6 +5,7 @@
 
 import { state } from "../../controller/state.js";
 import { GLOBAL_CURVE_PARAMS } from "../../core/curve_params.js";
+import { resolutionOptions } from "../resolutionOptions.js";
 import { dom } from "./state.js";
 
 // Logical grouping of override keys for the UI. Each group renders as a
@@ -42,19 +43,15 @@ function buildResolutionRow() {
   enabled.addEventListener("change", () => state.setBundleResolutionEnabled(enabled.checked));
   row.append(enabled);
 
-  const value = document.createElement("input");
-  value.type = "number";
-  value.className = "bundle-override__value";
-  value.dataset.resolution = "1";
-  value.min = "1";
-  value.step = "1";
-  value.value = String(res.value);
-  value.title = "Export tile resolution (px) applied to all bundled projects.";
-  value.addEventListener("change", () => {
-    state.setBundleResolutionValue(parseFloat(value.value) || 0);
-    value.value = String(state.getBundleResolution().value);
-  });
-  row.append(value);
+  // Same preset select as the Sources resolution picker (no "Auto" — the
+  // override forces a concrete value; the checkbox is the on/off).
+  const select = document.createElement("select");
+  select.className = "bundle-override__value";
+  select.dataset.resolution = "1";
+  select.title = "Export tile resolution (px) applied to all bundled projects.";
+  select.innerHTML = resolutionOptions(res.value, null);
+  select.addEventListener("change", () => state.setBundleResolutionValue(parseInt(select.value, 10)));
+  row.append(select);
 
   const label = document.createElement("span");
   label.className = "bundle-override__label";

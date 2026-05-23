@@ -10,6 +10,7 @@ import {
   collectHandles, drawHandles, hitTest,
   beginDrag, applyDrag, clearHit,
 } from "./handles.js";
+import { coalesceRaf } from "../raf.js";
 
 let host           = null;
 let stage          = null;
@@ -19,15 +20,6 @@ let resizeObserver = null;
 let drag           = null;
 let currentSize    = 0;
 let lastHandles    = null;
-
-function coalesceRaf(fn) {
-  let pending = false;
-  return function coalesced() {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(() => { pending = false; fn(); });
-  };
-}
 
 export function initSlotEditor() {
   host = document.getElementById("parameters");

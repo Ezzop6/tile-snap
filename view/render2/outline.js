@@ -3,6 +3,7 @@ import { GLOBAL_CURVE_PARAMS as P } from "../../core/curve_params.js";
 import { REFERENCE_SLOT_SIZE } from "./buildSlotGraph.js";
 import { withSlotTransform } from "./viewTransform.js";
 import { arcControlPoint } from "../../core/pointGraph/render.js";
+import { clamp01 } from "../../core/math.js";
 
 const EDGE_TOL = 0.5;
 
@@ -166,4 +167,3 @@ function appendCurve(path, a, b, curve, r, reversed = false) {
 }
 
 function identity(v) { return v; }
-function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }

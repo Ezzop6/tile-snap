@@ -1,5 +1,6 @@
 import { simplexNoise2D } from "../../../noise.js";
 import { arcControlPoint as arcControl } from "../../render.js";
+import { clamp01 } from "../../../math.js";
 
 // Higher SAMPLES_PER_CELL than MAX_CYCLES × 2 (Nyquist) so spike tips
 // register as actual triangle vertices in the wave-vertex polyline,
@@ -10,8 +11,6 @@ const WAVE_FREQ_MAX_CYCLES = 8;
 const JITTER_AMP_RANGE = 3.5;
 const NOISE_PEAK = 0.82;
 const INV_NOISE_PEAK = 1 / NOISE_PEAK;
-
-function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
 export function waveImpl(graph, opts = {}) {
   const amplitude = opts.amplitude ?? 0;

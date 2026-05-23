@@ -1,5 +1,6 @@
 import { state } from "../controller/state.js";
 import { collectPoolNames } from "../controller/storage.js";
+import { resolutionOptions } from "./resolutionOptions.js";
 
 let rowEls = null;
 
@@ -105,12 +106,7 @@ function ensureNameSuggestList() {
 function syncResolutionSelect() {
   const sel = document.getElementById("source-resolution");
   if (!sel) return;
-  const cur = state.exportResolution; // null = auto, else px
-  const presets = [16, 32, 48, 64, 96, 128, 256];
-  const sizes = (cur == null || presets.includes(cur)) ? presets : [...presets, cur].sort((a, b) => a - b);
-  const opts = [`<option value=""${cur == null ? " selected" : ""}>Auto (${state.nativeSlotSize} px)</option>`];
-  for (const n of sizes) opts.push(`<option value="${n}"${cur === n ? " selected" : ""}>${n} px</option>`);
-  sel.innerHTML = opts.join("");
+  sel.innerHTML = resolutionOptions(state.exportResolution, state.nativeSlotSize);
 }
 
 function refreshNameSuggestions(dl) {

@@ -4,7 +4,7 @@
 // matrix mirrors current edits without requiring a save.
 
 import { state } from "../../controller/state.js";
-import { projects as projectStorage } from "../../controller/storage.js";
+import { projects as projectStorage, projectExportResolution } from "../../controller/storage.js";
 import { getTemplateById } from "../../templates/index.js";
 import { bundled, dom, currentActiveProjectId } from "./state.js";
 import { renderCoverageMatrix } from "./coverage.js";
@@ -110,7 +110,7 @@ function bundledProjects() {
     const templateName = template?.name || templateRefId || "—";
     const resolution = (entry.projectId === activeId)
       ? state.exportSlotSize
-      : savedResolutionFor(savedData);
+      : projectExportResolution(savedData);
     return {
       projectId: entry.projectId,
       reversed:  entry.reversed,
@@ -137,22 +137,6 @@ function bundledProjects() {
     }
   }
   return list;
-}
-
-// Effective export resolution for a SAVED project blob (explicit, else auto =
-// largest source tileSize via the live inputs library).
-function savedResolutionFor(data) {
-  const r = data?.exportResolution;
-  if (Number.isFinite(r) && r > 0) return Math.round(r);
-  let max = 0;
-  for (const refs of [data?.pools?.A, data?.pools?.B]) {
-    if (!Array.isArray(refs)) continue;
-    for (const ref of refs) {
-      const inp = state.inputs.find((i) => i.id === ref?.inputId);
-      if (inp && inp.tileSize > max) max = inp.tileSize;
-    }
-  }
-  return max || 64;
 }
 
 // Pre-flight check for bundle export. Returns the list of entries whose

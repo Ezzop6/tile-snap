@@ -1,5 +1,7 @@
 // Polygon-offset based inflate using clipper-lib (global window.ClipperLib).
 
+import { cellOn } from "../../../cellValue.js";
+
 const SCALE = 1000;
 const MITER_LIMIT = 10.0;
 const ARC_TOLERANCE = 0.25;
@@ -321,8 +323,7 @@ function polygonEnclosesFilled(graph, polygon) {
   let filledIn = 0, emptyIn = 0;
   for (let r = 0; r < pattern.length; r++) {
     for (let c = 0; c < pattern[r].length; c++) {
-      const v = pattern[r][c];
-      const filled = Array.isArray(v) ? v.some((x) => x) : !!v;
+      const filled = cellOn(pattern[r][c]);
       const wx = graph.meta.origin.x + (c + 0.5) * cell.w;
       const wy = graph.meta.origin.y + (r + 0.5) * cell.h;
       if (pointInPolygon(polygon, wx * SCALE, wy * SCALE)) {

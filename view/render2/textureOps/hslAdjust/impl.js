@@ -4,6 +4,8 @@
 //   lightness  (−100..+100): additive shift on L (−100 → black, +100 → white)
 // Identity (all zero) short-circuits. Cached per (source, poolKey, h, s, l).
 
+import { clamp01 } from "../../../../core/math.js";
+
 const _cache = new WeakMap();
 
 export function applyHslAdjustImpl(srcCanvas, poolKey, params) {
@@ -53,8 +55,6 @@ function build(srcCanvas, hueDeg, satPct, lightPct) {
   outCanvas.getContext("2d", { willReadFrequently: true }).putImageData(new ImageData(out, W, H), 0, 0);
   return outCanvas;
 }
-
-function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;

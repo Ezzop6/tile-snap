@@ -1,5 +1,7 @@
 // save() lets QuotaExceededError bubble up so callers decide how to surface it (toast, dialog).
 
+import { firstFreeName } from "../core/freeName.js";
+
 const NS = "tilesetgen.v1";
 
 const KEY_PROJECT_MANIFEST  = `${NS}.project-manifest`;
@@ -61,12 +63,7 @@ function ensureProjectMigration() {
 // Convention: New + Duplicate both append " (N)" to keep names visually
 // distinct even though storage IDs are unique anyway.
 export function findFreeProjectName(baseName) {
-  const base = String(baseName ?? "untitled").trim() || "untitled";
-  const taken = new Set(projects.list().map((p) => p.name));
-  if (!taken.has(base)) return base;
-  let n = 2;
-  while (taken.has(`${base} (${n})`)) n++;
-  return `${base} (${n})`;
+  return firstFreeName(baseName, new Set(projects.list().map((p) => p.name)));
 }
 
 export const projects = {
@@ -378,6 +375,23 @@ export function collectPoolNames() {
     }
   }
   return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+// Effective export tile resolution for a SAVED project blob: its explicit
+// exportResolution, else the largest source tileSize (= the "auto" value).
+// Shared by bundle export (pre-flight resolution check) + bundle matrix cards.
+export function projectExportResolution(data) {
+  const r = data?.exportResolution;
+  if (Number.isFinite(r) && r > 0) return Math.round(r);
+  let max = 0;
+  for (const key of ["A", "B"]) {
+    const refs = Array.isArray(data?.pools?.[key]) ? data.pools[key] : [];
+    for (const ref of refs) {
+      const inp = ref?.inputId ? inputsLibrary.get(ref.inputId) : null;
+      if (inp && inp.tileSize > max) max = inp.tileSize;
+    }
+  }
+  return max || 64;
 }
 
 export const settings = {

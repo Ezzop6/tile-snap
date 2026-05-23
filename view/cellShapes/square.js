@@ -1,4 +1,5 @@
 import { DEBUG } from "../../config.js";
+import { cellOn as isOn } from "../../core/cellValue.js";
 
 // Square patterns are limited to the two sizes Godot terrain export maps to
 // peering bits: 2×2 (dual-grid corners) and 3×3 (single-grid 8-direction).
@@ -57,7 +58,6 @@ export const SQUARE = {
   renderOverlay(block, slot, cellSize, rows, cols, template) {
     if (!template?.connectedSaddle) return;
     const SLOT_GRID_GAP = 2;
-    const isOn = (v) => Array.isArray(v) ? v.some((x) => x) : !!v;
     const saddles = [];
     for (let r = 1; r < rows; r++) {
       for (let c = 1; c < cols; c++) {

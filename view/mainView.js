@@ -15,6 +15,7 @@ import {
   drawOutline,
 } from "./render2/index.js";
 import { createSelectionOverlay, slotClientRect } from "./selectionFrame.js";
+import { coalesceRaf } from "./raf.js";
 
 const SLOT_GAP = 0;
 
@@ -91,15 +92,6 @@ export function initMainView() {
   state.addEventListener("export-resolution:changed",  gated);
 
   refresh();
-}
-
-function coalesceRaf(fn) {
-  let pending = false;
-  return function coalesced() {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(() => { pending = false; fn(); });
-  };
 }
 
 function refresh() {

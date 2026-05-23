@@ -6,6 +6,7 @@ import {
 } from "../render2/index.js";
 import { withSlotTransform } from "../render2/viewTransform.js";
 import { inverseTransformVec } from "../../core/pointGraph/ops/cutTransform/impl.js";
+import { clamp } from "../../core/math.js";
 
 const HANDLE_RADIUS_PX = 10;
 const HIT_RADIUS_PX    = 12;
@@ -266,4 +267,3 @@ function drawBowHandles(ctx, origin, viewSize, handles, activeKey) {
   });
 }
 
-function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }

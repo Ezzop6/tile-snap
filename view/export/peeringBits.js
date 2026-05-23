@@ -12,6 +12,8 @@
 // peering bits. Caller logs a console.warn so the user knows manual setup
 // is needed in Godot.
 
+import { cellOn } from "../../core/cellValue.js";
+
 const CELL_TO_BIT = {
   "0,0": "top_left_corner",
   "0,1": "top_side",
@@ -36,11 +38,6 @@ const SIDE_BITS = new Set(["top_side", "right_side", "bottom_side", "left_side"]
 const CORNER_BITS = new Set(["top_left_corner", "top_right_corner", "bottom_right_corner", "bottom_left_corner"]);
 
 const PEERING_BIT_NAMES = Object.values(CELL_TO_BIT);
-
-function cellOn(v) {
-  if (Array.isArray(v)) return v.some((x) => x);
-  return !!v;
-}
 
 // Returns { body, bits, fallback } where:
 //   - body: true if center cell is ON (= tile body is Terrain 0).

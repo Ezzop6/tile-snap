@@ -14,6 +14,7 @@ import { sync } from "./refs.js";
 import { ensureEditable } from "./guards.js";
 import { reindexSlots, updateMeta } from "./layout.js";
 import { renderEditor } from "./render.js";
+import { cellOn } from "../../core/cellValue.js";
 
 const SIDE_BITS   = ["top_side", "right_side", "bottom_side", "left_side"];
 const CORNER_BITS = ["top_left_corner", "top_right_corner", "bottom_right_corner", "bottom_left_corner"];
@@ -83,8 +84,7 @@ function isAllZero(arr) {
   for (const row of arr) {
     if (!row) continue;
     for (const v of row) {
-      const on = Array.isArray(v) ? v.some((x) => x) : !!v;
-      if (on) return false;
+      if (cellOn(v)) return false;
     }
   }
   return true;

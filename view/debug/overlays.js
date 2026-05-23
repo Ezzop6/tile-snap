@@ -1,6 +1,7 @@
 import { isLayerActive } from "../debugPanel.js";
 import { drawNoiseOverlay as drawNoiseOverlayShared } from "../render2/noiseOverlay.js";
 import { SLOT_SIZE } from "./constants.js";
+import { cellOn } from "../../core/cellValue.js";
 
 // Cell tint draws under everything else: marks which cells of the slot
 // pattern are "on" (filled) so the user can correlate cut geometry with
@@ -16,9 +17,7 @@ export function drawSlotCellTints(ctx, slot, origin) {
   ctx.fillStyle = "rgba(59, 158, 255, 0.22)";
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const v = pattern[r][c];
-      const on = Array.isArray(v) ? v.some((x) => x) : !!v;
-      if (!on) continue;
+      if (!cellOn(pattern[r][c])) continue;
       ctx.fillRect(origin.x + c * cellW, origin.y + r * cellH, cellW, cellH);
     }
   }

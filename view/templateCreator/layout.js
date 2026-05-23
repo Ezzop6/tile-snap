@@ -2,6 +2,7 @@ import { state } from "../../controller/state.js";
 import { getMode } from "../modeTabs.js";
 import { getCellShape } from "../cellShapes/index.js";
 import { refs } from "./refs.js";
+import { cellOn } from "../../core/cellValue.js";
 
 export function makeEmptyArray(rows, cols, fill) {
   const factory = typeof fill === "function" ? fill : () => fill;
@@ -38,7 +39,6 @@ export function slotAt(t, lr, lc) {
 export function hasAnyPainted() {
   const t = state.template;
   if (!t) return false;
-  const cellOn = (v) => Array.isArray(v) ? v.some((x) => x) : !!v;
   for (const slot of t.slots) {
     for (const r of slot.array) {
       for (const v of r) if (cellOn(v)) return true;

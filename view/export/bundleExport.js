@@ -9,7 +9,7 @@
 // during the swap but they're invisible in Bundle mode.
 
 import { state } from "../../controller/state.js";
-import { projects as projectStorage, inputsLibrary } from "../../controller/storage.js";
+import { projects as projectStorage, projectExportResolution } from "../../controller/storage.js";
 import { VERSION } from "../../config.js";
 import { buildExportCanvas } from "./png.js";
 import {
@@ -101,22 +101,6 @@ function buildTerrainRegistry(projectInfos) {
 // filename for the .tres + ZIP. Optional `signal` (AbortSignal) lets the
 // caller cancel between projects; `onProgress({ index, total, projectName })`
 // is invoked before each project starts rendering. Returns { zip, filename }.
-// Effective export tile size for a SAVED project blob, without deserializing:
-// its explicit exportResolution, else the largest source tileSize (auto).
-function effectiveResolutionFor(data) {
-  const r = data?.exportResolution;
-  if (Number.isFinite(r) && r > 0) return Math.round(r);
-  let max = 0;
-  for (const key of ["A", "B"]) {
-    const refs = Array.isArray(data?.pools?.[key]) ? data.pools[key] : [];
-    for (const ref of refs) {
-      const inp = ref?.inputId ? inputsLibrary.get(ref.inputId) : null;
-      if (inp && inp.tileSize > max) max = inp.tileSize;
-    }
-  }
-  return max || 64;
-}
-
 export async function buildBundleZip({ entries, bundleName, atlasPathPrefix, signal, onProgress }) {
   if (!window.JSZip) throw new Error("JSZip not loaded");
   if (!entries || entries.length === 0) {
@@ -132,7 +116,7 @@ export async function buildBundleZip({ entries, bundleName, atlasPathPrefix, sig
     const sizes = new Set();
     for (const { projectId } of entries) {
       const d = projectStorage.load(projectId);
-      if (d) sizes.add(effectiveResolutionFor(d));
+      if (d) sizes.add(projectExportResolution(d));
     }
     if (sizes.size > 1) {
       throw new Error(

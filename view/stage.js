@@ -1,3 +1,5 @@
+import { clamp } from "../core/math.js";
+
 const DEFAULTS = {
   minZoom:     0.25,
   maxZoom:     8,
@@ -186,8 +188,4 @@ export function createStage(stageEl, opts = {}) {
       if (unsubShared) unsubShared();
     },
   };
-}
-
-function clamp(v, lo, hi) {
-  return v < lo ? lo : v > hi ? hi : v;
 }

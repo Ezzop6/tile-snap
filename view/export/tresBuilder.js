@@ -15,6 +15,7 @@ import { variantCellInGroup } from "./layout.js";
 import { buildVariantOverride } from "./tile.js";
 import { derivePeeringBits } from "./peeringBits.js";
 import { FALLBACK_COLOR, inverseColorOfTile } from "./colorHelpers.js";
+import { cellOn as cellOnArray } from "../../core/cellValue.js";
 
 // Re-export FALLBACK_COLOR so callers that already pulled it from this
 // module (= the .tres builder's terrain swatch fallback) don't break.
@@ -254,11 +255,6 @@ function hasFullInteriorPair(template) {
     if (allOnSlot && allOffSlot) return true;
   }
   return allOnSlot && allOffSlot;
-}
-
-function cellOnArray(v) {
-  if (Array.isArray(v)) return v.some((x) => x);
-  return !!v;
 }
 
 // Terrain naming + color from a pool's master tile. Name = filename without

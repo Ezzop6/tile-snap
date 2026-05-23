@@ -3,7 +3,7 @@ import {
   makePoint, makeConnection,
   LINE,
 } from "../types.js";
-import { cellOn }            from "./cellOn.js";
+import { cellOn }            from "../../cellValue.js";
 import { classifyRole }      from "./classifyRole.js";
 import { sideOf }            from "./sideOf.js";
 import { classifyCorner }    from "./classifyCorner.js";

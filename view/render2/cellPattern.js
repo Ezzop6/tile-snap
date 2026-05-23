@@ -2,6 +2,8 @@
 // slot.array are filled — the "intent" reference under the actual rendered
 // cut. Independent of any graph ops; reads slot.array directly.
 
+import { cellOn } from "../../core/cellValue.js";
+
 const TINT = "rgba(59, 158, 255, 0.22)";
 
 export function drawCellPattern(ctx, slot, origin, size) {
@@ -15,9 +17,7 @@ export function drawCellPattern(ctx, slot, origin, size) {
   ctx.fillStyle = TINT;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const v  = pattern[r][c];
-      const on = Array.isArray(v) ? v.some((x) => x) : !!v;
-      if (!on) continue;
+      if (!cellOn(pattern[r][c])) continue;
       ctx.fillRect(origin.x + c * cellW, origin.y + r * cellH, cellW, cellH);
     }
   }

@@ -11,6 +11,7 @@ import {
   drawCutStroke,
 } from "./render2/index.js";
 import { drawNoiseOverlay } from "./render2/noiseOverlay.js";
+import { coalesceRaf } from "./raf.js";
 
 const SLOT_GAP = 0;
 const MIN_SLOT = 16;
@@ -56,15 +57,6 @@ export function initMapView() {
   resizeObserver.observe(stage);
 
   refresh();
-}
-
-function coalesceRaf(fn) {
-  let pending = false;
-  return function coalesced() {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(() => { pending = false; fn(); });
-  };
 }
 
 function refresh() {

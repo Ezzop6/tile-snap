@@ -2,6 +2,7 @@ import { state } from "../../controller/state.js";
 import { applyRenderModeClass } from "../projectBar.js";
 import { xs } from "./_state.js";
 import { drawTileInto, drawSourceInto } from "./tile.js";
+import { cellOn } from "../../core/cellValue.js";
 
 function buildPatternMarker(slot, color, col, row) {
   const arr = slot.array;
@@ -14,7 +15,6 @@ function buildPatternMarker(slot, color, col, row) {
   marker.style.gridRow    = String(row + 1);
   marker.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   marker.style.gridTemplateRows    = `repeat(${rows}, 1fr)`;
-  const cellOn = (v) => Array.isArray(v) ? v.some((x) => x) : !!v;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = document.createElement("div");

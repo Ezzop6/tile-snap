@@ -3,6 +3,7 @@ import { wangEdges16 } from "./wang-edges-16.js";
 import { blob47 } from "./blob-47.js";
 import { dualGrid } from "./dual-grid.js";
 import { templates as templateStorage } from "../controller/storage.js";
+import { firstFreeName } from "../core/freeName.js";
 
 // Fraction of cellSize each bridge vertex is pre-shifted toward its empty
 // corner before cornerSoften / inflate. 0.25 = legacy dual default.
@@ -210,17 +211,13 @@ export function newTemplateId() {
 // itself); opts.alsoTaken reserves extra names (a duplicate must differ from
 // its source even when the source isn't persisted yet).
 export function findFreeTemplateName(baseName, { excludeId, alsoTaken } = {}) {
-  const base = String(baseName ?? "untitled").trim() || "untitled";
   const taken = new Set(alsoTaken || []);
   for (const t of BUILTIN) taken.add(t.name);
   for (const m of templateStorage.list()) {
     if (excludeId && m.id === excludeId) continue;
     taken.add(m.name);
   }
-  if (!taken.has(base)) return base;
-  let n = 2;
-  while (taken.has(`${base} (${n})`)) n++;
-  return `${base} (${n})`;
+  return firstFreeName(baseName, taken);
 }
 
 // In-memory clone of a built-in template marked as 'unsaved' user template.
