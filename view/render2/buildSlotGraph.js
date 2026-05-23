@@ -140,9 +140,19 @@ function applyCutBowOverrides(graph, slot) {
   }
 }
 
-// Handle pass: original grid points (p_r_c) survive only through organic
-// and inflate — cornerSoften splits or deletes them. Slot-editor handles
-// need stable positions regardless of which downstream ops are active.
+// Handle pass: the slot editor drags grid points (p_r_c), so the handles
+// must track the cursor 1:1. organic only shifts each point by a fixed
+// per-cell vector (hashed from cell index + seed, NOT from the point's
+// position), so it stays constant during a drag and the handle still
+// follows the cursor exactly.
+//
+// inflate is intentionally EXCLUDED here even though p_r_c points survive
+// it: Clipper offset repositions those points NONLINEARLY (and jumps
+// discontinuously near its collapse threshold), so a handle drawn at the
+// post-inflate position would "shoot away" from the cursor mid-drag instead
+// of going where dragged. The handle therefore sits on the grid+organic
+// point; inflate stays a downstream stylisation of the visible cut only.
+// cornerSoften+ are skipped too — they split or delete the p_r_c points.
 export function buildHandleGraph(slot) {
   const t = state.template;
   const graph = buildPointGraph(
@@ -156,28 +166,25 @@ export function buildHandleGraph(slot) {
     },
   );
   applyTileOffsets(graph, slot);
-  applyOrganicInflate(graph, slot);
+  applyHandleOrganic(graph, slot);
   applySlotCutTransform(graph, slot);
   return graph;
 }
 
-function applyOrganicInflate(graph, slot) {
+function applyHandleOrganic(graph, slot) {
   const cellSize = (graph.meta.cell.w + graph.meta.cell.h) / 2;
   const cp = state.globalCurve;
   const organicAmp =
     (cp.organic ?? 0) *
     (GLOBAL_CURVE_PARAMS.organic?.effectScale ?? 1) *
     cellSize;
-  const inflateAmt =
-    (cp.inflate ?? 0) *
-    (GLOBAL_CURVE_PARAMS.inflate?.effectScale ?? 1) *
-    INFLATE_BASELINE;
-  const seed = state.seed | 0;
-  const slotCol = slot?.col ?? 0;
-  const slotRow = slot?.row ?? 0;
-  if (organicAmp !== 0)
-    organic(graph, { amplitude: organicAmp, seed, slotCol, slotRow });
-  if (inflateAmt !== 0) inflate(graph, inflateAmt);
+  if (organicAmp === 0) return;
+  organic(graph, {
+    amplitude: organicAmp,
+    seed: state.seed | 0,
+    slotCol: slot?.col ?? 0,
+    slotRow: slot?.row ?? 0,
+  });
 }
 
 // User drag offsets land on grid points (id "p_r_c") AND dual saddle
