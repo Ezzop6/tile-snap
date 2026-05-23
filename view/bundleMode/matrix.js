@@ -40,7 +40,7 @@ export function renderMatrix() {
 // "projectName.A/B" follow the source pool too, so identity stays stable).
 function bundledProjects() {
   const activeId = currentActiveProjectId();
-  return bundled.map((entry) => {
+  const list = bundled.map((entry) => {
     const meta = projectStorage.meta(entry.projectId);
     if (!meta) return null;
     // Always load the saved blob: bundle export reads from it (not from live
@@ -108,14 +108,51 @@ function bundledProjects() {
       variantTotal += getVariantCount(slot.index);
     }
     const templateName = template?.name || templateRefId || "—";
+    const resolution = (entry.projectId === activeId)
+      ? state.exportSlotSize
+      : savedResolutionFor(savedData);
     return {
       projectId: entry.projectId,
       reversed:  entry.reversed,
       meta, projectName, poolA, poolB,
       layout, templateName, slotCount, variantTotal, includeA, includeB,
       templateValid, missingTemplateId,
+      resolution,
     };
   }).filter(Boolean);
+
+  // Resolution display + mismatch flagging across the whole bundle. With the
+  // bundle Resolution override on, all projects render at the forced value
+  // (no mismatch). With it off, every project keeps its own resolution and
+  // any that differs from the first (= the .tres tile_size reference) is
+  // flagged — same blocking condition as the export pre-flight.
+  const override = state.getBundleResolution?.() || { enabled: false, value: 0 };
+  if (override.enabled) {
+    for (const e of list) { e.resolution = override.value; e.resolutionForced = true; e.resolutionMismatch = false; }
+  } else {
+    const ref = list[0]?.resolution;
+    for (const e of list) {
+      e.resolutionForced = false;
+      e.resolutionMismatch = list.length > 1 && e.resolution !== ref;
+    }
+  }
+  return list;
+}
+
+// Effective export resolution for a SAVED project blob (explicit, else auto =
+// largest source tileSize via the live inputs library).
+function savedResolutionFor(data) {
+  const r = data?.exportResolution;
+  if (Number.isFinite(r) && r > 0) return Math.round(r);
+  let max = 0;
+  for (const refs of [data?.pools?.A, data?.pools?.B]) {
+    if (!Array.isArray(refs)) continue;
+    for (const ref of refs) {
+      const inp = state.inputs.find((i) => i.id === ref?.inputId);
+      if (inp && inp.tileSize > max) max = inp.tileSize;
+    }
+  }
+  return max || 64;
 }
 
 // Pre-flight check for bundle export. Returns the list of entries whose

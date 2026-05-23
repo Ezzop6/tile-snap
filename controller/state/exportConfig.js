@@ -11,6 +11,9 @@ export function initExportConfigState(state) {
   state._exportLayoutView = "textures";
   state._exportIncludeSourceA = false;
   state._exportIncludeSourceB = false;
+  // Export tile resolution (px). null = auto (largest source tileSize, as before).
+  // Project-level — saved with the project, set in the export Main panel.
+  state._exportResolution = null;
   // Master-biased pool randomize: master gets this share, variants split (1 - share).
   state._exportMasterShare = 0.75;
 }
@@ -151,6 +154,29 @@ export function applyExportConfigMixin(StateClass) {
   Object.defineProperty(StateClass.prototype, "exportShowGroups", {
     get() { return this._exportShowGroups; },
   });
+
+  // null = auto. Raw stored value (null or a positive int).
+  Object.defineProperty(StateClass.prototype, "exportResolution", {
+    get() { return this._exportResolution; },
+  });
+
+  // Effective export tile size in px: explicit override, else auto (= largest
+  // source tileSize via nativeSlotSize). The whole export pipeline reads this.
+  Object.defineProperty(StateClass.prototype, "exportSlotSize", {
+    get() {
+      const r = this._exportResolution;
+      return (Number.isFinite(r) && r > 0) ? Math.round(r) : this.nativeSlotSize;
+    },
+  });
+
+  StateClass.prototype.setExportResolution = function (value) {
+    // null / 0 / invalid → auto.
+    const n = +value;
+    const v = (value == null || !Number.isFinite(n) || n <= 0) ? null : Math.round(n);
+    if (v === this._exportResolution) return;
+    this._exportResolution = v;
+    this.dispatchEvent(new CustomEvent("export-resolution:changed", { detail: v }));
+  };
 
   StateClass.prototype.setExportShowGroups = function (value) {
     const v = !!value;

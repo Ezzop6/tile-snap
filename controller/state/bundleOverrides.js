@@ -29,6 +29,10 @@ export function initBundleOverridesState(state) {
   for (const key of BUNDLE_OVERRIDE_KEYS) {
     state._bundleOverrides[key] = { enabled: false, value: defaultsFor(key) };
   }
+  // Export tile resolution forced onto every bundled project. Not a globalCurve
+  // key (lives outside BUNDLE_OVERRIDE_KEYS) — when off, each project uses its
+  // own resolution and the bundle export blocks if they don't all match.
+  state._bundleResolution = { enabled: false, value: 64 };
 }
 
 export function applyBundleOverridesMixin(StateClass) {
@@ -57,6 +61,25 @@ export function applyBundleOverridesMixin(StateClass) {
     this.dispatchEvent(new CustomEvent("bundle-overrides:changed", { detail: { key, field: "value" } }));
   };
 
+  // Resolution override (separate from the curve keys above).
+  StateClass.prototype.getBundleResolution = function () {
+    return this._bundleResolution;
+  };
+
+  StateClass.prototype.setBundleResolutionEnabled = function (enabled) {
+    const b = !!enabled;
+    if (this._bundleResolution.enabled === b) return;
+    this._bundleResolution.enabled = b;
+    this.dispatchEvent(new CustomEvent("bundle-overrides:changed", { detail: { key: "resolution", field: "enabled" } }));
+  };
+
+  StateClass.prototype.setBundleResolutionValue = function (value) {
+    const n = Math.round(+value);
+    if (!Number.isFinite(n) || n <= 0 || this._bundleResolution.value === n) return;
+    this._bundleResolution.value = n;
+    this.dispatchEvent(new CustomEvent("bundle-overrides:changed", { detail: { key: "resolution", field: "value" } }));
+  };
+
   // Bulk load (used by settings hydration on app start).
   StateClass.prototype.loadBundleOverrides = function (obj) {
     if (!obj || typeof obj !== "object") return;
@@ -68,6 +91,11 @@ export function applyBundleOverridesMixin(StateClass) {
       if (typeof inc.enabled === "boolean") cur.enabled = inc.enabled;
       if ("value" in inc) cur.value = inc.value;
     }
+    const res = obj.resolution;
+    if (res && typeof res === "object") {
+      if (typeof res.enabled === "boolean") this._bundleResolution.enabled = res.enabled;
+      if (Number.isFinite(res.value) && res.value > 0) this._bundleResolution.value = Math.round(res.value);
+    }
     this.dispatchEvent(new CustomEvent("bundle-overrides:changed", { detail: null }));
   };
 
@@ -78,6 +106,7 @@ export function applyBundleOverridesMixin(StateClass) {
       if (!ov) continue;
       out[key] = { enabled: ov.enabled, value: ov.value };
     }
+    out.resolution = { enabled: this._bundleResolution.enabled, value: this._bundleResolution.value };
     return out;
   };
 }

@@ -12,7 +12,7 @@ import {
 } from "../render2/index.js";
 
 export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
-  const nat = state.nativeSlotSize;
+  const nat = state.exportSlotSize;
   const ov = isVariant ? buildVariantOverride(slot.index, variantIdx) : null;
   const noiseOverride = state.exportShowIslands
     ? (ov?.noise || null)
@@ -66,7 +66,7 @@ export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
 // canvas) draw — autoTileable / boundarySnap / colorAdjust / etc.
 // applied to the pool that owns this entry.
 export function buildSourceBlock(entry) {
-  const nat = state.nativeSlotSize;
+  const nat = state.exportSlotSize;
   const canvas = document.createElement("canvas");
   canvas.className = "layout-tile is-source";
   canvas.width  = nat;

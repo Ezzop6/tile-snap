@@ -79,6 +79,7 @@ export function applySerializeMixin(StateClass) {
       exportVariability: this._exportVariability,
       exportShowIslands: this._exportShowIslands,
       exportLayoutView: this._exportLayoutView,
+      exportResolution: this._exportResolution,
       exportIncludeSourceA: this._exportIncludeSourceA,
       exportIncludeSourceB: this._exportIncludeSourceB,
       exportMasterShare: this._exportMasterShare,
@@ -324,6 +325,8 @@ export function applySerializeMixin(StateClass) {
     }
     this._exportShowIslands = !!obj.exportShowIslands;
     this._exportLayoutView  = obj.exportLayoutView === "textures" ? "textures" : "cuts";
+    this._exportResolution  = (Number.isFinite(obj.exportResolution) && obj.exportResolution > 0)
+      ? Math.round(obj.exportResolution) : null;
     // Legacy single flag (`exportIncludeSources`) migrates to both A and B
     // so old projects that opted in keep both sides bundled.
     const legacyBundle = !!obj.exportIncludeSources;
@@ -357,6 +360,7 @@ export function applySerializeMixin(StateClass) {
     this.dispatchEvent(new CustomEvent("export-variability:changed", { detail: this._exportVariability }));
     this.dispatchEvent(new CustomEvent("export-show-islands:changed", { detail: this._exportShowIslands }));
     this.dispatchEvent(new CustomEvent("export-layout-view:changed", { detail: this._exportLayoutView }));
+    this.dispatchEvent(new CustomEvent("export-resolution:changed", { detail: this._exportResolution }));
     this.dispatchEvent(new CustomEvent("export-include-sources:changed", { detail: { key: "A", value: this._exportIncludeSourceA } }));
     this.dispatchEvent(new CustomEvent("export-include-sources:changed", { detail: { key: "B", value: this._exportIncludeSourceB } }));
     this.dispatchEvent(new CustomEvent("template-dirty:changed", { detail: false }));

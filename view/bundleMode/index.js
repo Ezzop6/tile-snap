@@ -43,7 +43,11 @@ export function initBundleMode() {
   hydrateBundleFromSettings();
   renderOverrides();
 
-  state.addEventListener("bundle-overrides:changed", () => syncOverrideRows());
+  state.addEventListener("bundle-overrides:changed", () => {
+    syncOverrideRows();
+    // Resolution override flips per-card mismatch flags → rebuild the cards.
+    if (isActive() && !isExporting()) renderAll();
+  });
   state.addEventListener("project:deleted", (e) => pruneDeletedProject(e.detail));
 
   // Live-update when relevant state shifts. The matrix reads each project's

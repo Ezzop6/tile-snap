@@ -27,7 +27,7 @@ export async function runExport() {
 export async function buildExportCanvas() {
   if (!state.template) return null;
 
-  const slotSize = state.nativeSlotSize;
+  const slotSize = state.exportSlotSize;
   const filename = sanitizeFilename(state.projectName) || "tileset";
   const t = state.template;
   const isSmooth = state.renderMode === "smooth";

@@ -9,7 +9,7 @@ export function renderTemplate(canvas, opts = {}) {
   if (!canvas || !t) return;
 
   const {
-    slotSize = state.nativeSlotSize,
+    slotSize = state.exportSlotSize,
     slotGap = 0,
     showCurveDebug = false,
     freezeNoise = false,

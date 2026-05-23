@@ -3,10 +3,7 @@
 // accent stripe + the "(reversed)" name suffix; the rest of the card
 // stays readable instead of italic-dimmed.
 
-import {
-  bundled, bundledIndex, isInBundle, persistBundle, renderAll,
-  currentActiveProjectId,
-} from "./state.js";
+import { bundled, bundledIndex, isInBundle, persistBundle, renderAll, currentActiveProjectId } from "./state.js";
 import { loadProjectById } from "../projectBar.js";
 import { setMode } from "../modeTabs.js";
 
@@ -27,19 +24,47 @@ export function sortedEntries(entries) {
 }
 
 export function buildEntryCard(entry) {
-  const { projectId, reversed, projectName, poolA, poolB,
-          layout, templateName, slotCount, variantTotal, includeA, includeB,
-          templateValid, missingTemplateId } = entry;
+  const {
+    projectId,
+    reversed,
+    projectName,
+    poolA,
+    poolB,
+    layout,
+    templateName,
+    slotCount,
+    variantTotal,
+    includeA,
+    includeB,
+    templateValid,
+    missingTemplateId,
+    resolution,
+    resolutionMismatch,
+    resolutionForced,
+  } = entry;
 
   const card = document.createElement("div");
-  card.className = "bundle-card"
-    + (reversed         ? " bundle-card--reversed" : "")
-    + (!templateValid   ? " bundle-card--invalid"  : "");
+  card.className =
+    "bundle-card" + (reversed ? " bundle-card--reversed" : "") + (!templateValid || resolutionMismatch ? " bundle-card--invalid" : "");
   if (!templateValid) {
     card.title = `Template "${missingTemplateId || "?"}" is missing — bundle export is blocked until you reload + re-save the project with a valid template.`;
+  } else if (resolutionMismatch) {
+    card.title = `Export resolution ${resolution} px differs from the other bundled projects.`;
   }
 
-  card.append(buildProjectSection(projectName, templateName, layout, reversed, templateValid, missingTemplateId));
+  card.append(
+    buildProjectSection(
+      projectName,
+      templateName,
+      layout,
+      reversed,
+      templateValid,
+      missingTemplateId,
+      resolution,
+      resolutionMismatch,
+      resolutionForced,
+    ),
+  );
   card.append(buildPoolsSection(poolA, poolB));
   card.append(buildOpenSection(projectId));
   card.append(buildStatsSection(slotCount, variantTotal, includeA, includeB));
@@ -60,9 +85,7 @@ function buildOpenSection(projectId) {
   btn.type = "button";
   btn.className = "btn btn--sm bundle-card__open-btn";
   btn.textContent = isActive ? "↗ Active" : "↗ Open";
-  btn.title = isActive
-    ? "This project is already active"
-    : "Load this project and switch to Preview mode";
+  btn.title = isActive ? "This project is already active" : "Load this project and switch to Preview mode";
   btn.disabled = isActive;
   btn.addEventListener("click", async () => {
     btn.disabled = true;
@@ -79,7 +102,17 @@ function buildOpenSection(projectId) {
   return sec;
 }
 
-function buildProjectSection(projectName, templateName, layout, reversed, templateValid, missingTemplateId) {
+function buildProjectSection(
+  projectName,
+  templateName,
+  layout,
+  reversed,
+  templateValid,
+  missingTemplateId,
+  resolution,
+  resolutionMismatch,
+  resolutionForced,
+) {
   const sec = document.createElement("div");
   sec.className = "bundle-card__section bundle-card__section--project";
 
@@ -99,6 +132,18 @@ function buildProjectSection(projectName, templateName, layout, reversed, templa
     tmpl.textContent = `⚠ Missing template "${missingTemplateId || "?"}" — reload + re-save the project to fix`;
   }
   sec.append(tmpl);
+
+  // Resolution as info; on a bundle mismatch it switches to the same ⚠ error
+  // style as the missing-template line.
+  const res = document.createElement("div");
+  res.className = "bundle-card__meta";
+  if (resolutionMismatch) {
+    res.classList.add("bundle-card__meta--error");
+    res.textContent = `⚠ ${resolution} px — differs from other projects; enable the Resolution override or match resolutions`;
+  } else {
+    res.textContent = `${resolution} px${resolutionForced ? " (bundle override)" : ""}`;
+  }
+  sec.append(res);
 
   return sec;
 }
@@ -136,8 +181,7 @@ function buildPoolBlock(pool) {
   }
 
   const name = document.createElement("span");
-  name.className = "bundle-matrix__name"
-    + (pool.fallback ? " bundle-matrix__name--fallback" : "");
+  name.className = "bundle-matrix__name" + (pool.fallback ? " bundle-matrix__name--fallback" : "");
   name.textContent = pool.effective;
   block.append(name);
 
@@ -152,10 +196,8 @@ function buildStatsSection(slotCount, variantTotal, includeA, includeB) {
   tiles.className = "bundle-card__stat";
   const extras = Math.max(0, variantTotal - slotCount);
   tiles.innerHTML =
-    `<strong>${slotCount}</strong> slots`
-    + (extras > 0
-      ? ` <span class="bundle-matrix__sub">+ ${extras} variants</span>`
-      : ` <span class="bundle-matrix__sub">no variants</span>`);
+    `<strong>${slotCount}</strong> slots` +
+    (extras > 0 ? ` <span class="bundle-matrix__sub">+ ${extras} variants</span>` : ` <span class="bundle-matrix__sub">no variants</span>`);
   sec.append(tiles);
 
   const srcRow = document.createElement("div");
@@ -164,13 +206,14 @@ function buildStatsSection(slotCount, variantTotal, includeA, includeB) {
   srcLabel.className = "bundle-matrix__sub";
   srcLabel.textContent = "bundle";
   srcRow.append(srcLabel);
-  for (const [letter, on] of [["A", includeA], ["B", includeB]]) {
+  for (const [letter, on] of [
+    ["A", includeA],
+    ["B", includeB],
+  ]) {
     const badge = document.createElement("span");
     badge.className = "bundle-matrix__src-badge" + (on ? " is-on" : "");
     badge.textContent = letter;
-    badge.title = on
-      ? `Pool ${letter} bundled with the export`
-      : `Pool ${letter} NOT bundled`;
+    badge.title = on ? `Pool ${letter} bundled with the export` : `Pool ${letter} NOT bundled`;
     srcRow.append(badge);
   }
   sec.append(srcRow);

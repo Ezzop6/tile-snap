@@ -28,6 +28,7 @@ const MUTATION_EVENTS = [
   "export-variability:changed",
   "export-show-islands:changed",
   "export-layout-view:changed",
+  "export-resolution:changed",
   "export-include-sources:changed",
   "export-master-share:changed",
 ];

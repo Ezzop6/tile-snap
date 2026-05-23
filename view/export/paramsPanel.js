@@ -42,7 +42,24 @@ export function renderParams() {
     `;
   }
 
+  // Export tile resolution: Auto (largest source) + presets, plus the current
+  // value if it isn't a preset (e.g. an odd source size loaded from a project).
+  const curRes = state.exportResolution;
+  const resPresets = [16, 32, 48, 64, 96, 128, 256];
+  const resSizes = (curRes == null || resPresets.includes(curRes))
+    ? resPresets : [...resPresets, curRes].sort((a, b) => a - b);
+  const resOptions = [
+    `<option value=""${curRes == null ? " selected" : ""}>Auto (${state.nativeSlotSize} px)</option>`,
+    ...resSizes.map((n) => `<option value="${n}"${curRes === n ? " selected" : ""}>${n} px</option>`),
+  ].join("");
+
   mainBody.innerHTML = `
+    <label class="curve-panel__field" title="Export tile resolution in px. Auto = largest source texture. Saved with the project. Pixel vs smooth upscaling follows the global render mode (next to seed).">
+      <span class="curve-panel__label">Resolution</span>
+      <select class="curve-panel__input curve-panel__input--narrow" id="export-resolution">
+        ${resOptions}
+      </select>
+    </label>
     <label class="curve-panel__field" title="Where variant tiles get packed in the output PNG">
       <select class="curve-panel__input" id="export-direction">
         <option value="smart" ${dir === "smart" ? "selected" : ""}>Pack: square (auto)</option>
@@ -113,6 +130,10 @@ export function renderParams() {
     `;
   }
 
+  mainBody.querySelector("#export-resolution")?.addEventListener("change", (e) => {
+    const v = e.target.value;
+    state.setExportResolution(v === "" ? null : parseInt(v, 10));
+  });
   mainBody.querySelector("#export-direction").addEventListener("change", (e) => {
     state.setExportVariantDirection(e.target.value);
   });

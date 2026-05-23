@@ -22,6 +22,45 @@ export function renderOverrides() {
   for (const group of OVERRIDE_GROUPS) {
     overridesEl.append(buildOverrideRow(group));
   }
+  overridesEl.append(buildResolutionRow());
+}
+
+// Resolution override — not a globalCurve key, so its own row. When on, every
+// bundled project is exported at this tile size; when off, the bundle export
+// requires all projects to already share one resolution.
+function buildResolutionRow() {
+  const row = document.createElement("div");
+  row.className = "bundle-override";
+  row.dataset.groupId = "resolution";
+
+  const res = state.getBundleResolution();
+
+  const enabled = document.createElement("input");
+  enabled.type = "checkbox";
+  enabled.title = "Force one export resolution onto every bundled project. Needed when projects use different resolutions.";
+  enabled.checked = !!res.enabled;
+  enabled.addEventListener("change", () => state.setBundleResolutionEnabled(enabled.checked));
+  row.append(enabled);
+
+  const value = document.createElement("input");
+  value.type = "number";
+  value.className = "bundle-override__value";
+  value.dataset.resolution = "1";
+  value.min = "1";
+  value.step = "1";
+  value.value = String(res.value);
+  value.title = "Export tile resolution (px) applied to all bundled projects.";
+  value.addEventListener("change", () => {
+    state.setBundleResolutionValue(parseFloat(value.value) || 0);
+    value.value = String(state.getBundleResolution().value);
+  });
+  row.append(value);
+
+  const label = document.createElement("span");
+  label.className = "bundle-override__label";
+  label.textContent = "resolution (px)";
+  row.append(label);
+  return row;
 }
 
 function buildOverrideRow(group) {
@@ -101,6 +140,14 @@ export function syncOverrideRows() {
   const overridesEl = dom.overridesEl;
   if (!overridesEl) return;
   for (const row of overridesEl.querySelectorAll(".bundle-override")) {
+    if (row.dataset.groupId === "resolution") {
+      const res = state.getBundleResolution();
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = !!res.enabled;
+      const num = row.querySelector("[data-resolution]");
+      if (num && num.value !== String(res.value)) num.value = String(res.value);
+      continue;
+    }
     const group = OVERRIDE_GROUPS.find((g) => g.id === row.dataset.groupId);
     if (!group) continue;
     const cb = row.querySelector('input[type="checkbox"]');

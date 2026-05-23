@@ -9,7 +9,7 @@
 // during the swap but they're invisible in Bundle mode.
 
 import { state } from "../../controller/state.js";
-import { projects as projectStorage } from "../../controller/storage.js";
+import { projects as projectStorage, inputsLibrary } from "../../controller/storage.js";
 import { VERSION } from "../../config.js";
 import { buildExportCanvas } from "./png.js";
 import {
@@ -101,10 +101,45 @@ function buildTerrainRegistry(projectInfos) {
 // filename for the .tres + ZIP. Optional `signal` (AbortSignal) lets the
 // caller cancel between projects; `onProgress({ index, total, projectName })`
 // is invoked before each project starts rendering. Returns { zip, filename }.
+// Effective export tile size for a SAVED project blob, without deserializing:
+// its explicit exportResolution, else the largest source tileSize (auto).
+function effectiveResolutionFor(data) {
+  const r = data?.exportResolution;
+  if (Number.isFinite(r) && r > 0) return Math.round(r);
+  let max = 0;
+  for (const key of ["A", "B"]) {
+    const refs = Array.isArray(data?.pools?.[key]) ? data.pools[key] : [];
+    for (const ref of refs) {
+      const inp = ref?.inputId ? inputsLibrary.get(ref.inputId) : null;
+      if (inp && inp.tileSize > max) max = inp.tileSize;
+    }
+  }
+  return max || 64;
+}
+
 export async function buildBundleZip({ entries, bundleName, atlasPathPrefix, signal, onProgress }) {
   if (!window.JSZip) throw new Error("JSZip not loaded");
   if (!entries || entries.length === 0) {
     throw new Error("Bundle is empty");
+  }
+
+  // Resolution override (bundle-wide). When off, every project keeps its own
+  // export resolution — but Godot needs ONE shared tile_size, so a bundle of
+  // mismatched resolutions is rejected up front (defensive, like a missing
+  // template). The override forces a single resolution onto all projects.
+  const resOverride = state.getBundleResolution?.() || { enabled: false, value: 0 };
+  if (!resOverride.enabled) {
+    const sizes = new Set();
+    for (const { projectId } of entries) {
+      const d = projectStorage.load(projectId);
+      if (d) sizes.add(effectiveResolutionFor(d));
+    }
+    if (sizes.size > 1) {
+      throw new Error(
+        `Cannot bundle: projects use different export resolutions (${[...sizes].sort((a, b) => a - b).join(", ")} px). ` +
+        `Enable the Resolution override to unify them, or set the same export resolution in each project.`,
+      );
+    }
   }
   const checkAbort = () => {
     if (signal?.aborted) throw new DOMException("Bundle export aborted", "AbortError");
@@ -162,6 +197,8 @@ export async function buildBundleZip({ entries, bundleName, atlasPathPrefix, sig
       // future params). Applied after deserialize so the project's own
       // values are loaded first, then overwritten where override is on.
       applyBundleOverrides();
+      // Force the shared resolution onto this project (overrides its own).
+      if (resOverride.enabled) state.setExportResolution(resOverride.value);
 
       const built = await renderActiveAtlas();
       if (!built) continue;
@@ -318,6 +355,12 @@ export async function buildBundleZip({ entries, bundleName, atlasPathPrefix, sig
     exportedAt:      new Date().toISOString(),
     bundleName:      safeName,
     atlasPathPrefix: pathPrefix,
+    // Shared export tile resolution (px) the whole bundle was rendered at =
+    // the .tres tile_size. Always uniform: a successful export either forces
+    // it via the resolution override or required every project to already
+    // match (mismatches are blocked up front). appliedOverrides.resolution
+    // records whether that uniform value came from the override.
+    resolution:      projectInfos[0].slotSize,
     appliedOverrides: serializeAppliedOverrides(),
     entries: entries.map((e) => ({
       projectId:   e.projectId,
