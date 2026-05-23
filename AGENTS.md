@@ -1,14 +1,16 @@
 # AGENTS.md — Tileset Generator
 
-Vlastní pracovní poznámky pro Claude. Specifikace = `tileset-generator-spec.md` (zdroj pravdy).
-Tento soubor je navigace + rozpracované pochopení, **ne** kopie specu.
+Vlastní pracovní poznámky pro Claude — navigace + rozpracované pochopení projektu.
+(Původní `tileset-generator-spec.md`, `info.md` i `AGENTS_LOG.md` byly smazány;
+tenhle soubor je teď primární dokumentace.)
 
 ---
 
 ## TL;DR
 
 Browser-only nástroj (jeden `index.html` + JS moduly z CDN) pro generování **vektorových tilesetů**.
-Žádný build step, žádný npm. Vše z CDN.
+Žádný build step pro vývoj, žádný npm — `index.html` se otevírá přímo. (Opt-in distribuční
+build `make build` existuje jen pro nasazení, netýká se dev — viz "Konvence".)
 
 **Účel nástroje (důležité — neztratit kontext):** generovat **artwork pro tileset** který se importuje do Godotu; Godot pak za běhu placuje skutečné dlaždice podle terrain pravidel. **Tool ne-řeší autotile / terrain logiku** (od toho je Godot), pouze produkuje statické zdrojové obrázky. Hlavní use-case = **přechody mezi 2 podklady** (tráva ↔ hlína atp.). Pro to potřebujeme: 2 source textury, transformace (rotate/flip) pro varianty stejného přechodu na různé strany, a **clip masky** definující tvar přechodu.
 
@@ -23,16 +25,20 @@ Jakmile UI sedí, hned **import** (drag & drop + RMB → Import). Vše ostatní 
 
 ## Stack — quick reference
 
-| Co | Knihovna | K čemu |
+Vše z CDN jako UMD globály (žádný npm v dev). Aktuálně načtené v `index.html`:
+
+| Co | Knihovna (CDN verze) | K čemu |
 |---|---|---|
-| Geometrie / Bézier / boolean ops | **Paper.js 0.12.18** | jádro rendereru (curve = paper.Path / CompoundPath) |
-| Offset / inflate | **paperjs-offset 1.0.8** | `PaperOffset.offset(path, amount)` |
-| Variace | **simplex-noise 4.x** + **seedrandom 3.x** | reproducibilní noise/wave |
-| Resizable layout | **Split.js 1.6.x** | dělící panely |
+| Boolean ops (unite/subtract) | **Paper.js 0.12.18** | merge noise ↔ cut region (`ops/merge/impl.js`) |
+| Polygon offset / inflate | **clipper-lib 6.4.2** | `ClipperLib` chain offset (`ops/inflate/clipper.js`) |
+| Noise / wave | **simplex-noise 2.4.0** | reproducibilní noise/wave (konstruktor bere seed přímo) |
+| Resizable layout | **Split.js 1.6** | dělící panely |
+| ZIP export | **JSZip 3.10.1** | bundle/atlas ZIP (`export/bundleExport.js`, `zipExport.js`) |
 
-Aktuálně používáme: **Split.js** (jen). Paper.js + paperjs-offset + simplex-noise + seedrandom **přidat až s adopcí** (viz `info.md`, sekce 1).
+**Pozn.:** `paperjs-offset` ani `seedrandom` se NEpoužívají — offset řeší Clipper,
+seeding simplex-noise v2 + `core/random.js`.
 
-Vanilla: layout (CSS grid), event emitter (~30 řádků), context menu (~80 řádků), File API.
+Vanilla: layout (CSS grid), event emitter (StateController), context menu, File API.
 
 ---
 
@@ -40,7 +46,7 @@ Vanilla: layout (CSS grid), event emitter (~30 řádků), context menu (~80 řá
 
 1. **3 vrstvy: view / controller / core.** Core = pure functions, žádný DOM, žádný globální state.
 2. **Pure functions jako API contract** — vstup/výstup serializovatelné POJO/SVG string. Důvod: pozdější přesun do Pythonu nezmění volající kód.
-3. **Reactive flow:** Tweakpane → `controller.updateParam` → emit event → listener volá `core.composeTileset` → render do preview.
+3. **Reactive flow:** UI panel (vanilla) → `state.set*` setter → emit event → listener volá render2 (buildSlotGraph + draw) → render do preview. (Žádný Tweakpane — vlastní panely.)
 4. **Šablona = data, ne kód.** Blob/Wang/custom popsané strukturou (`BLOB_47_TEMPLATE = { tiles: [...] }`).
 5. **Layered tile model.** Každý input je kolekce vrstev (vector/bitmap/svg_import/procedural) skládaných přes blend/mask/boolean.
 
@@ -51,8 +57,10 @@ Vanilla: layout (CSS grid), event emitter (~30 řádků), context menu (~80 řá
 Nová abstrakční vrstva v `core/pointGraph/` má vlastní pravidla nad rámec hlavní architektury výše. Migrace dokončena — legacy renderer + `geometry.js` + `grid_outline.js` smazány, aktivní pipeline jede přes `view/render2/`.
 
 1. **Per-step separation** — každý aspekt pipeline = vlastní soubor:
-   `classifyCorner` / `classifyRole` / `sideOf` / `cellOn` / `assignPointLocks` /
+   `classifyCorner` / `classifyRole` / `sideOf` / `assignPointLocks` /
    `assignChainIds` / `splitSaddleVertices`. Jedna funkce, jeden soubor.
+   (`cellOn` = "je buňka filled?" žije v `core/cellValue.js` — sdílené napříč
+   build + render + export, ne per-step soubor.)
 
 2. **Per-kind branching via dispatcher** — `build/index.js` a každý
    `ops/<op>/index.js` jsou dispatchery; dnes všechny volají jediný `impl.js`
@@ -67,9 +75,12 @@ Nová abstrakční vrstva v `core/pointGraph/` má vlastní pravidla nad rámec 
    na `opts.kind` parameter pro `buildPointGraph`, který stamps `graph.meta.kind`
    na výsledný graf.
 
-4. **Pipeline pořadí** (`view/render2/buildSlotGraph.js#applyOps`):
+4. **Pipeline pořadí** (`buildPointGraph` + `view/render2/buildSlotGraph.js#applyOps`):
    `buildPointGraph → applyTileOffsets → organic → cornerSoften → inflate
    → applyCutBowOverrides → wave → noise → merge → cutTransform`.
+   noise + merge běží **per-vrstva** (A holes → merge A, pak B patches → merge B),
+   ne jako jeden trailing krok. wave + noise sdílí jedno gate rozhodnutí
+   (`state.renderThrottle && isInteracting()` — viz "Draw gates").
    tileOffsets = user-drag intent aplikované jako úplně první transformace.
    Inflate **musí** běžet po cornerSoften protože je polyline-offset
    chain-aware: bere už soften-shaped chain a offsetuje ji s concave
@@ -84,7 +95,7 @@ Nová abstrakční vrstva v `core/pointGraph/` má vlastní pravidla nad rámec 
    `ctx.translate(origin) + ctx.scale(viewSize / REFERENCE_SLOT_SIZE)`
    přes `view/render2/viewTransform.js#withSlotTransform`. Důsledek:
    jeden logický bod = stejné coords ve všech views (mainView, mapView,
-   slotEditor, mapMode, export). Hit-testing inverse-transform mouse → REF.
+   slotEditor, debug, export). Hit-testing inverse-transform mouse → REF.
 
 6. **Op coloring v debugu** — chainId prefix určuje barvu:
    curve cuts (chainId = `c_<from>_<to>` nebo `chain_..._segN`) = červená,
@@ -126,11 +137,11 @@ Nová abstrakční vrstva v `core/pointGraph/` má vlastní pravidla nad rámec 
 ### Aktuální stav v repu
 
 ```
-tools/tileset_generator/
+tileset_generator/
 ├── index.html                 — HTML scaffold (topbar + 3-pane workspace + drop overlay)
 ├── main.js                    — entry: Split.js + settings boot + view wiring + drag&drop router +
 │                                top-level await on state.loadInputsLibrary() + Texture-mode handler
-├── config.js                  — app-wide flags. `DEBUG` toggles legacy Map tab + in-progress
+├── config.js                  — app-wide flags. `DEBUG` toggles the Debug tab + in-progress
 │                                features (triangle cellShape, Sides terrain mode). `VERSION` =
 │                                tool version semver string stamped into every saved/exported JSON
 │                                (project blob, template blob, template export, project export).
@@ -139,7 +150,8 @@ tools/tileset_generator/
 ├── controller/
 │   ├── state.js               — shim → ./state/index.js (singleton + mixin composition)
 │   ├── state/
-│   │   ├── index.js           — composes inputs/pools/template/params/exportConfig/serialize
+│   │   ├── index.js           — composes inputs/pools/template/params/exportConfig/bundleOverrides/
+│   │   │                        bundlePath/projectDirty/importSettings/serialize
 │   │   ├── inputs.js          — imported images (state._inputs) + selectedTile pick.
 │   │   │                        addInput/removeInput/updateInput sync the global
 │   │   │                        `inputsLibrary` storage. `state.loadInputsLibrary()`
@@ -156,13 +168,19 @@ tools/tileset_generator/
 │   │   │                        replaceTemplate swaps ref without wiping (builtin→copy, post-save).
 │   │   │                        notifyTemplateChanged re-emits without ref swap (in-place edits).
 │   │   │                        markTemplateDirty / markTemplateClean + template-dirty:changed event.
-│   │   ├── params.js          — curve, noise, seed, renderMode, renderThrottle, projectName, mapVisible.
+│   │   ├── params.js          — curve, noise, seed, renderThrottle, traceVisible, traceRecording,
+│   │   │                        projectName, mapVisible. (renderMode ODSTRANĚN — vše vždy crisp.)
 │   │   │                        Plus `_globalTextureOps = { A, B }` per-pool bitmap pipeline params
 │   │   │                        seeded from `buildOpDefaults()` (= TEXTURE_OPS registry). API:
 │   │   │                        getGlobalTextureOp(poolKey, opName) + setGlobalTextureOpParam(...).
 │   │   │                        Event: `texture-ops:changed`.
 │   │   ├── exportConfig.js    — per-slot variantCount/ranges/variantOffsets + global toggles +
-│   │   │                        master-biased random share (`_exportMasterShare`, default 0.75)
+│   │   │                        master-biased random share (`_exportMasterShare`, default 0.75) +
+│   │   │                        export resolution: `_exportResolution` + `exportResolution` getter +
+│   │   │                        `exportSlotSize` getter (override ?? native max source tileSize) +
+│   │   │                        `setExportResolution` + event `export-resolution:changed`.
+│   │   │                        PROJECT-LEVEL (platí pro preview I export), ukládá se k projektu —
+│   │   │                        ovládá se z Sources headeru (#source-resolution).
 │   │   ├── bundleOverrides.js — Bundle-wide override registry. `BUNDLE_OVERRIDE_KEYS` lists
 │   │   │                        globalCurve params that can be force-applied to every bundled
 │   │   │                        project at export time (currently outlineColor + outlineWidth).
@@ -218,9 +236,13 @@ tools/tileset_generator/
 │   │                            migrations. `inputsLibrary.{list,get,put,remove}` global metadata
 │   │                            store. `projects.rename` syncs both `entry.name` + `entry.data.projectName`;
 │   │                            `projects.load` self-heals legacy entries where the two diverged.
-│   │                            `findFreeProjectName(base)` returns `base` or `base (N)` with smallest
-│   │                            free N≥2 — used by New + Duplicate to keep names visually unique
-│   │                            (IDs are unique anyway, this is purely for the user).
+│   │                            `findFreeProjectName(base)` → deleguje na core/freeName.js#firstFreeName
+│   │                            (`base` / `base (N)`) — New + Duplicate drží názvy vizuálně unikátní
+│   │                            (IDs jsou unique tak jako tak, tohle je čistě pro usera).
+│   │                            `collectPoolNames()` = množina pool-name napříč projekty (autocomplete
+│   │                            v sourcePanelu). `projectExportResolution(data)` = efektivní export
+│   │                            rozlišení saved blobu (explicit exportResolution else max source
+│   │                            tileSize přes inputsLibrary, fallback 64) — bundle resolution check.
 │   │                            `findUnusedInputs()` returns inputsLibrary entries with no pool ref
 │   │                            in any saved project — UI-driven cleanup target. `cleanOrphanImage-
 │   │                            Binaries()` removes images.<hash> entries no library entry points at
@@ -231,8 +253,19 @@ tools/tileset_generator/
 │   ├── source.js              — loadImageFile, splitIntoTiles. Tile canvases
 │   │                            get `willReadFrequently:true` on first getContext
 │   │                            (tresBuilder reads center pixel for swatch).
-│   ├── noise.js               — simplex/ridged/billowy/fbm/worley wrappers + buildNoiseMask + maskToContours
+│   ├── noise.js               — simplex/ridged/billowy/fbm/worley wrappers + buildNoiseMask + applyEdgeFade
 │   ├── random.js              — seeded RNG
+│   ├── cellValue.js           — cellOn(v): single source of truth "je buňka filled?"
+│   │                            (scalar truthy | triangle-array any-wedge). Sdílené napříč
+│   │                            build pipeline, render2, export, editory.
+│   ├── math.js                — clamp(v,lo,hi) + clamp01(v) numeric helpery (de-dup ze
+│   │                            stage/handles/wave/outline/hsl ops). Pozn.: templates/index.js
+│   │                            má vlastní clamp01(v, fallback) s jinou signaturou — neslučovat.
+│   ├── freeName.js            — firstFreeName(baseName, taken): " (N)" suffix logika.
+│   │                            Sdílí findFreeProjectName (storage.js) + findFreeTemplateName.
+│   ├── geometry.js            — pure 2D helpery (pointToSegmentDistance, minDistanceToSegments);
+│   │                            používá noise.js + view/debug/click.js.
+│   ├── trace.js               — perf tracer (setTracingEnabled, timed); buildSlotGraph + slotComposite.
 │   ├── curve_params.js        — GLOBAL_CURVE_PARAMS registry + defaults (organic, inflate, cornerSoftness, cornerArcness, waveAmplitude, waveFrequency, waveJitter, waveSymmetric, outlineWidth, outlineColor)
 │   ├── noise_params.js        — NOISE_LAYER_PARAMS + NOISE_LAYER_KEYS (A/B) + NOISE_LAYER_SIDE + seed range
 │   ├── variant_params.js      — VARIANT_PARAMS (export variant axes, noise per-layer A/B)
@@ -249,7 +282,6 @@ tools/tileset_generator/
 │       │   ├── classifyCorner.js          — cornerType + outwardNormal + miterScale per point
 │       │   ├── classifyRole.js            — cut / closure / internal per connection
 │       │   ├── sideOf.js                  — interiorSide helper
-│       │   ├── cellOn.js                  — normalize cell value (scalar | triangle array)
 │       │   ├── assignPointLocks.js        — per-axis lock based on slot edge position
 │       │   ├── assignChainIds/            — chain id assignment
 │       │   │   ├── index.js               — dispatcher on connectedSaddle
@@ -325,19 +357,31 @@ tools/tileset_generator/
 │   ├── index.js               — listTemplates / getTemplateById / saveUserTemplate /
 │   │                            deleteUserTemplate / templateRegistry event target /
 │   │                            defaultTemplate / builtinTemplates / isBuiltinTemplate /
-│   │                            cloneTemplateAsUser (deep clone w/ source="unsaved" + new id) /
-│   │                            findFreeTemplateName(base) → `base` or `base (N)` with smallest
-│   │                            free N≥2 checked against BOTH builtin + user storage (no silent
-│   │                            overwrite — mirrors findFreeProjectName semantics) /
-│   │                            templateIdFromName(name) public slug helper for callers that
-│   │                            persist + retrieve by id (Duplicate, Import).
+│   │                            cloneTemplateAsUser (deep clone w/ source="unsaved" + opaque id) /
+│   │                            newTemplateId() (opaque, name-independent — = storage.newId) /
+│   │                            findFreeTemplateName(base, {excludeId, alsoTaken}) → deleguje na
+│   │                            core/freeName.js#firstFreeName; taken = builtin + user DISPLAY names
+│   │                            (display-name uniqueness; ids jsou opaque, takže nekolidují) /
+│   │                            templateIdFromName(name) slug — POUZE pro human-friendly export
+│   │                            filenames (NE pro persist/retrieve; storage ids jsou opaque).
 │   │                            (normalize → gridKind + connectedSaddle defaults by parity)
 │   ├── wang-edges-16.js       — 16-tile Wang edge builtin (4×4, 3×3 pattern, single + split)
 │   ├── blob-47.js             — 47-tile Godot blob builtin (single + split)
 │   └── dual-grid.js           — 16-tile dual-grid builtin (4×4, 2×2 pattern, dual + bridge)
 ├── view/
 │   ├── dropZone.js            — window-wide drag & drop overlay (file-only)
-│   ├── sourcePanel.js         — dva source sloty v levém panelu
+│   ├── raf.js                 — coalesceRaf(fn): rAF-coalesce factory (1 paint/frame).
+│   │                            Importují mainView / mapView / slotEditor.
+│   ├── resolutionOptions.js   — RESOLUTION_PRESETS [16,32,48,64,96,128,256] + resolutionOptions(current,
+│   │                            autoValue) → <option> HTML. Sdílí sourcePanel + bundleMode/overrides.
+│   ├── sharedTransform.js     — singleton { zoom, offsetX, offsetY } + notify/subscribe. Sdílený
+│   │                            pan/zoom napříč Preview / Export / Debug stages.
+│   ├── selectionFrame.js      — createSelectionOverlay(stageEl, stage): screen-space DOM overlay
+│   │                            (.slot-selection-frame, tenká crisp čára nezávislá na rozlišení textury)
+│   │                            + slotClientRect(...). Jednotný selection frame na všech pohledech.
+│   ├── sourcePanel.js         — dva source sloty v levém panelu + #source-resolution select
+│   │                            (resolutionOptions, project-level rozlišení pro preview I export,
+│   │                            state.setExportResolution) + autocomplete názvů poolů (collectPoolNames).
 │   ├── inputsPanel.js         — karty per import + tile click select. Trash button walks live
 │   │                            state pool refs + every saved project's pool refs and, if the input
 │   │                            is referenced anywhere, opens a confirmDestructive dialog listing
@@ -345,22 +389,23 @@ tools/tileset_generator/
 │   │                            Only deletes when user confirms; otherwise no-op.
 │   ├── render2/               — ACTIVE renderer (PointGraph-based, vector coords)
 │   │   ├── index.js           — public API: REFERENCE_SLOT_SIZE, buildSlotGraph, buildHandleGraph,
-│   │   │                        withSlotTransform, viewScale, drawCellPattern, drawCutFill,
+│   │   │                        buildBowGraph, withSlotTransform, viewScale, drawCellPattern, drawCutFill,
 │   │   │                        drawCutStroke, buildCutPath, drawSlotComposite, drawOutline, renderTemplate
-│   │   ├── buildSlotGraph.js  — buildSlotGraph(slot, opts?) + buildHandleGraph(slot)
-│   │   │                        REFERENCE_SLOT_SIZE = 96 (export). Pipeline: buildPointGraph →
-│   │   │                        applyTileOffsets → organic → cornerSoften → inflate → wave →
-│   │   │                        noise → merge → cutTransform. applyTileOffsets BEFORE organic
-│   │   │                        (= user-drag intent first). cutTransform LAST so all chains move together.
-│   │   │                        applyOps accepts opts.curveOverride/noiseOverride for export variants.
-│   │   │                        buildHandleGraph stops after inflate (cornerSoften destroys p_r_c points).
+│   │   ├── buildSlotGraph.js  — buildSlotGraph(slot, opts?) + buildHandleGraph(slot) + buildBowGraph(slot)
+│   │   │                        REFERENCE_SLOT_SIZE = 96. Pipeline (applyOps): buildPointGraph →
+│   │   │                        applyTileOffsets → organic → cornerSoften → inflate → applyCutBowOverrides
+│   │   │                        → wave → (noise A → merge A) → (noise B → merge B) → cutTransform.
+│   │   │                        applyTileOffsets BEFORE organic (= user-drag intent first). cutTransform
+│   │   │                        LAST so all chains move together. applyOps accepts opts.curveOverride/
+│   │   │                        noiseOverride for export variants. buildHandleGraph stops BEFORE inflate
+│   │   │                        (Clipper offset by handle points rozhodil — runs only organic + cutTransform).
 │   │   │                        Per-event graph cache: Map keyed by slot ref (NOT slot.index — builtin
 │   │   │                        templates share refs across getTemplateById). Cache cleared by top-level
 │   │   │                        state listeners on template/global-curve/noise/seed/tile-offsets:changed
 │   │   │                        events; module-import order guarantees these fire before any view's
 │   │   │                        refresh listener. Bypassed when opts has overrides (export variants,
 │   │   │                        stopBeforeWave). Result: 1 slot graph build per event burst across
-│   │   │                        mainView+mapView+slotEditor+mapMode views.
+│   │   │                        mainView+mapView+slotEditor+debug views.
 │   │   ├── viewTransform.js   — withSlotTransform(ctx, origin, viewSize, fn) helper
 │   │   │                        applies ctx.translate + ctx.scale and calls fn(scale)
 │   │   ├── cellPattern.js     — drawCellPattern(ctx, slot, origin, size) — source-pattern blue tint
@@ -372,7 +417,8 @@ tools/tileset_generator/
 │   │   ├── slotComposite.js   — drawSlotComposite(ctx, slot, graph, origin, viewSize, opts):
 │   │   │                        bg pool B tile + clipped pool A tile via buildCutPath. Resolves
 │   │   │                        per-slot pool override (state.getSlotPoolOverride) before master.
-│   │   │                        imageSmoothingEnabled = !snap.
+│   │   │                        imageSmoothingEnabled = false (snap hardcoded true — pixel-art crisp;
+│   │   │                        render mode pryč). Per-pool texture-ops chain volán v sourceBitmap().
 │   │   ├── outline.js         — drawOutline(ctx, graph, origin, viewSize, opts): stroked boundary
 │   │   │                        (skips segments on slot edge — wouldn't be visible). Gradient
 │   │   │                        N+1 stacked strokes white→outlineColor (legacy formula).
@@ -381,8 +427,14 @@ tools/tileset_generator/
 │   │   │                        supports slotOverrides Map for per-variant params,
 │   │   │                        ignoreSlotPoolOverride for variant pass).
 │   │   ├── drawGraph.js       — canvas-side debug renderer for PointGraph. drawGraph(ctx, graph, opts)
-│   │   │                        consumes CORNER_COLOR from core/pointGraph/render.js. Only mapMode
-│   │   │                        uses it today.
+│   │   │                        consumes CORNER_COLOR from core/pointGraph/render.js. Only the debug
+│   │   │                        stage uses it today.
+│   │   ├── noiseOverlay.js    — drawNoiseOverlay + NOISE_OVERLAY_COLORS: noise A/B mask fills.
+│   │   │                        Shared — mapView, debug/overlays.js, debugPanel, texOps registry.
+│   │   ├── interactionGate.js — isInteracting() globální čítač (pointerdown/up nad slidery + slot
+│   │   │                        editor canvas). buildSlotGraph skipuje wave/noise když
+│   │   │                        `state.renderThrottle && isInteracting()`; release → noise:changed
+│   │   │                        catch-up paint. (Viz "Draw gates".)
 │   │   └── textureOps/        — Bitmap pipeline applied to pool source canvases before drawImage.
 │   │       │                    Two distinct flavours: per-slot ctx-state ops (textureTransform) +
 │   │       │                    per-pool bitmap preprocessors (the registry-driven family).
@@ -408,11 +460,12 @@ tools/tileset_generator/
 │   │       └── gradientOverlay/{index,impl}.js  — linear darken/lighten 4-direction
 │   │                                                Each op caches per WeakMap<srcCanvas,Map<key,canvas>>;
 │   │                                                identity-param → returns input unchanged.
-│   ├── mainView.js            — big preview canvas. drawSlotComposite + drawOutline + selection frame.
-│   │                            1:1 backing/CSS (legacy parity); pixel/smooth = ctx.imageSmoothingEnabled
-│   │                            + CSS image-rendering only. Refresh listeners wrapped via
-│   │                            gateRefreshDuringTemplateMode — paint clicks inside the template editor
-│   │                            mark dirty + flush once on mode exit.
+│   ├── mainView.js            — big preview canvas. drawSlotComposite + drawOutline + shared selection
+│   │                            overlay (createSelectionOverlay z selectionFrame.js — DOM overlay, NE
+│   │                            canvas kresba). Backing size = state.exportSlotSize (unified render/export
+│   │                            rozlišení), vždy crisp (render mode pryč). Stage sdílí pan/zoom přes
+│   │                            sharedTransform. Refresh listeners wrapped via gateRefreshDuringTemplateMode
+│   │                            — paint clicks inside the template editor mark dirty + flush once on mode exit.
 │   ├── mapView.js             — top-right preview overlay. drawCellPattern + drawCutStroke
 │   │                            (clean abstract: pattern + colored cut line). No debug clutter.
 │   │                            State-event listeners gated through gateRefreshDuringTemplateMode;
@@ -420,7 +473,7 @@ tools/tileset_generator/
 │   ├── viewRefreshGate.js     — gateRefreshDuringTemplateMode(refresh): wraps a view's refresh fn so
 │   │                            calls inside template mode mark dirty and skip; mode-change subscription
 │   │                            flushes one refresh when the user leaves template mode. Applied to
-│   │                            mainView / mapView / slotEditor. NOT for mapMode / exportPanel — those
+│   │                            mainView / mapView / slotEditor. NOT for debug stage / export panel — those
 │   │                            already check their own isActive() before refreshing.
 │   ├── slotEditor/            — selected-slot editor. Subdir per concept; new sections sit as
 │   │   │                        peers of poolOverride.js.
@@ -472,8 +525,9 @@ tools/tileset_generator/
 │   │                            běží nezávisle se seed offsetem (A: seed, B: seed+9973).
 │   ├── seedPanel.js           — seed quick controls
 │   ├── projectBar.js          — topbar Save button (`.is-dirty` class accent fill bound to
-│   │                            `project-dirty:changed`) + open-modal button + render mode +
-│   │                            render throttle toggle. Owns save / load / new / delete /
+│   │                            `project-dirty:changed`) + open-modal button + render throttle toggle
+│   │                            (render mode UI ODSTRANĚN; applyRenderModeClass natvrdo `.render-pixel`).
+│   │                            Owns save / load / new / delete /
 │   │                            duplicate / import flows; dirty-guard via dialog.js#confirmDiscardOrSave.
 │   │                            Drag-drop + modal Import button ALWAYS go through
 │   │                            confirmReplaceOrNew (Replace/Open-as-new/Cancel) — never silently
@@ -538,17 +592,22 @@ tools/tileset_generator/
 │   │   ├── matrix.js          — renderMatrix + `bundledProjects()` data resolution (live state
 │   │   │                        for active project, saved JSON for others) + describeLayout +
 │   │   │                        resolveMasterThumb + effectiveTerrain fallback "projectName.A/B".
+│   │   │                        Per-entry resolution přes projectExportResolution + flag
+│   │   │                        resolutionMismatch / resolutionForced napříč bundlem.
 │   │   ├── card.js            — buildEntryCard + per-section builders (project info / pools /
 │   │   │                        stats / actions) + sortedEntries (groups forward + reverse pair).
 │   │   │                        Reverse entries get a left-edge accent stripe + "(reversed)"
-│   │   │                        suffix; rest of the card stays normal-weight readable.
+│   │   │                        suffix; rest of the card stays normal-weight readable. Karta zobrazuje
+│   │   │                        resolution řádek + "⚠ … px — differs from other projects" warning
+│   │   │                        (značí kartu `--invalid`) — stejný styl jako missing-template warning.
 │   │   ├── coverage.js        — N×N directional coverage matrix. Pair tracked as DIRECTED
 │   │   │                        (poolA → poolB) + UNDIRECTED — cells render ✓ (forward
 │   │   │                        covered), ↺ (reverse-only), or empty (missing entirely).
 │   │   │                        Header columns rotated -45°. Cells `aspect-ratio: 1`.
 │   │   ├── overrides.js       — renderOverrides + syncOverrideRows. Groups state's flat keys
-│   │   │                        into UI rows via OVERRIDE_GROUPS (currently one row: "outline"
-│   │   │                        = outlineColor + outlineWidth, single toggle, label at end).
+│   │   │                        into UI rows via OVERRIDE_GROUPS: "outline" (outlineColor +
+│   │   │                        outlineWidth) + "resolution" řádek (resolutionOptions select),
+│   │   │                        každá skupina s vlastním enable toggle.
 │   │   └── exportRunner.js    — onExportClick + openExportProgress overlay + triggerDownload.
 │   │                            AbortController gives the user a cancel button between projects;
 │   │                            `setExporting(true)` flag suppresses bundle-mode rerender
@@ -630,19 +689,26 @@ tools/tileset_generator/
 │   │                            toast offers Switch action button to load the copy.
 │   ├── export/                — export panel (split z exportPanel.js)
 │   │   ├── index.js, _state.js, layout.js, paramsPanel.js, preview.js, utils.js
-│   │   │                        layout.js: `buildPatternMarker` (square N×M grid mirroring
-│   │   │                        slot.array, "on" cells = per-group hue) + `buildSelectionFrame`
-│   │   │                        (sibling grid item with border + box-sizing:border-box) replace
-│   │   │                        the old triangle marker + outline-based selection. No `.template-frame`.
+│   │   │                        layout.js: renderLayout kreslí JEDEN `layout-atlas` canvas (backing
+│   │   │                        1:1, cell = state.exportSlotSize, drawTileInto/drawSourceInto z tile.js)
+│   │   │                        + transparentní `.layout-tile` divy (placeCell) pro click/selection +
+│   │   │                        `buildPatternMarker` (square N×M grid mirroring slot.array, "on" cells =
+│   │   │                        per-group hue). Selection = sdílený screen-space overlay (selectionFrame.js),
+│   │   │                        ne canvas kresba. Display sjednoceno s preview/PNG (žádné per-tile canvasy
+│   │   │                        ani švy). Stage sdílí pan/zoom přes sharedTransform.
 │   │   │                        paramsPanel: Variants count slider + slot meta live in the
 │   │   │                        Preview section's controls strip (Variants section was deleted);
 │   │   │                        🎲 randomize-all moved to Main section header.
-│   │   ├── tile.js            — buildSlotBlock + buildVariantOverride (uses view/render2/) +
-│   │   │                        `applyPoolTextureOps(srcCanvas, poolKey)` (exported) — chains
-│   │   │                        TEXTURE_OPS registry for export Layout preview + PNG bundle.
-│   │   ├── png.js             — bulk PNG export (uses view/render2/renderTemplate). Master + every
-│   │   │                        variant pass set includeNoise:true + includeWave:true so the export
-│   │   │                        bypasses both throttle gates (full-quality output).
+│   │   ├── tile.js            — drawTileInto(ctx, slot, isVariant, variantIdx, origin, size) +
+│   │   │                        drawSourceInto(ctx, entry, origin, size) (kreslí do atlas canvasu,
+│   │   │                        size = state.exportSlotSize) + buildSlotBlock (preview panel) +
+│   │   │                        buildVariantOverride (uses view/render2/) + `applyPoolTextureOps(
+│   │   │                        srcCanvas, poolKey)` (exported) — chains TEXTURE_OPS registry pro
+│   │   │                        export Layout + PNG. snap:true (render mode pryč).
+│   │   ├── png.js             — bulk PNG export přes buildExportCanvas (jeden atlas, cell =
+│   │   │                        state.exportSlotSize, imageSmoothingEnabled=false). Master + variant
+│   │   │                        pass includeNoise:true + includeWave:true → bypass throttle gate
+│   │   │                        (full-quality output).
 │   │   ├── jsonExport.js      — runJsonExport: state.serialize() + bundle via
 │   │   │                        buildProjectExportPayload → JSON.stringify → downloadBlob with
 │   │   │                        `.tilesetproj.json` extension. Same payload shape as the modal's
@@ -677,7 +743,10 @@ tools/tileset_generator/
 │   │   │                        complementary swatch). Shared by tresBuilder + future
 │   │   │                        per-source brightness / colour-ramp ops.
 │   │   ├── bundleExport.js    — Combined bundle export. `buildBundleZip({ entries, bundleName,
-│   │   │                        atlasPathPrefix, signal, onProgress })` snapshots live state,
+│   │   │                        atlasPathPrefix, signal, onProgress })` PRE-FLIGHT BLOK: odmítne
+│   │   │                        export když se export rozlišení projektů (projectExportResolution)
+│   │   │                        rozchází a není forced resolution override (= defenzivní chování
+│   │   │                        jako u missing template). Pak snapshots live state,
 │   │   │                        deserializes each bundled project in turn, optionally
 │   │   │                        state.swapPools() for reversed entries, applies bundle overrides
 │   │   │                        via applyBundleOverrides(), renders atlas PNG via
@@ -694,7 +763,8 @@ tools/tileset_generator/
 │   │   │                        (forward entries only — reversed is a virtual variant of the
 │   │   │                        same project, no duplicate JSON) + `bundle.manifest.json`
 │   │   │                        capturing tool VERSION, exportedAt, bundleName, atlasPathPrefix,
-│   │   │                        appliedOverrides snapshot, and ordered entries list. Per-project
+│   │   │                        resolution (= shared slotSize), appliedOverrides snapshot, and ordered
+│   │   │                        entries list. Per-project
 │   │   │                        JSONs reflect the SAVED-snapshot payload (buildProjectExportPayload-
 │   │   │                        ForSaved), not the post-mutation export state — manifest is the
 │   │   │                        place for "what was applied during this export". Signal aborts
@@ -707,8 +777,12 @@ tools/tileset_generator/
 │   │   │                        without suggesting Pool A bundle (A is plain now) and T1 warning
 │   │   │                        when neither template nor Pool B bundle covers the interior.
 │   ├── exportPanel.js         — shim → ./export/index.js
-│   └── stage.js               — shared pan/zoom + fit + view-reset chrome,
-│                                 used by mainView + export + creator + mapMode
+│   ├── stage.js               — shared pan/zoom + fit + view-reset chrome + `shared` transform option
+│   │                            (singleton z sharedTransform.js → Preview/Export/Debug sdílí zoom/pan
+│   │                            napříč přepnutím módu) + onTransform(cb). Used by mainView + export +
+│   │                            creator + debug.
+│   └── tracePanel.js          — perf-trace right-panel (data-mode="debug"): tracing toggle +
+│                                 výpis timed() měření z core/trace.js.
 ├── styles/
 │   ├── tokens.css             — design tokens (:root). Loaded directly by index.html <link>
 │   │                            so tokens are available immediately, not blocked behind main.css.
@@ -731,28 +805,30 @@ tools/tileset_generator/
 │   ├── creator.css            — Template-creator modal + toolbar + editor grid + slot cells
 │   ├── bundle.css             — Bundle mode (stage, cards, coverage matrix, project picker,
 │   │                            overrides, progress overlay)
-│   └── export.css             — Export mode (layout grid, preview, selection frame, variability)
+│   ├── export.css             — Export mode (layout grid, preview, selection frame, variability)
+│   ├── dialog.css             — dialog.js multi-button confirm modal (.dialog__*)
+│   └── projectModal.css       — projectModal.js full-screen project picker (grid rows, pool boxes)
 ├── build.sh                   — opt-in DISTRIBUTION build → dist/ (bundle/minify/obfuscate via
 │                                esbuild + javascript-obfuscator + html-minifier-terser, npx-only,
 │                                no package.json). NOT part of dev/run. OBFUSCATE=none|light|heavy.
 ├── Makefile                   — distribution build targets: build(=light) / build-min / build-light /
 │                                build-heavy / serve (:8000) / clean. Wraps build.sh.
 ├── AGENTS.md                  — currently-valid spec (this file). Changes only on user confirm.
-├── AGENTS_LOG.md              — archived status log + landing for new entries
-├── info.md                    — original spec / pipeline notes
-└── tileset-generator-spec.md
+└── scrap.md                   — scratchpad (zatím prázdný)
 ```
 
 ### Right-panel mode visibility — `data-mode` attr
 
 `data-mode` na `.panel-section` = SPACE-SEPARATED list módů ve kterých má být
-sekce viditelná (např. `data-mode="preview map"` → viditelné v preview I map).
+sekce viditelná (např. `data-mode="preview debug"` → viditelné v preview I debug).
 CSS (`styles/main.css`) řídí přes `body.<mode>-active [data-mode]:not([data-mode~="<mode>"])`.
+Módy: preview / export / template / texture / bundle / debug (žádný "map" — Map tab
+byl nahrazen Debug módem).
 
-Curve · global + Noise A (holes) + Noise B (patches) panely teď všechny
-`data-mode="preview map"` — sdílené UI mezi preview a map módem. Stejné
+Curve · global + Noise A (holes) + Noise B (patches) panely jsou
+`data-mode="preview debug"` — sdílené UI mezi preview a debug módem. Stejné
 slidery → `state.globalCurve` / `state.noiseParams.{A,B}` → konzumováno
-mainView + mapView + slotEditor + mapMode + export přes jedinou cestu.
+mainView + mapView + slotEditor + debug stage + export přes jedinou cestu.
 
 ### Persistence model — quick reference
 
@@ -779,8 +855,8 @@ mainView + mapView + slotEditor + mapMode + export přes jedinou cestu.
   - Side effect: exported project JSON is no longer self-contained (images live
     only in storage). Sharing flows will need ZIP bundling or per-input PNG
     export — handled by the upcoming export rewrite.
-- **`tilesetgen.v1.setting.<key>`** — app-wide prefs (`renderMode`,
-  `mapVisible`, `renderThrottle`, `traceVisible`, `traceRecording`, `modeTab`,
+- **`tilesetgen.v1.setting.<key>`** — app-wide prefs (`mapVisible`,
+  `renderThrottle`, `traceVisible`, `traceRecording`, `modeTab`,
   `inputsCols`, `lastProjectId`, plus Bundle-mode singletons
   `bundleSelection` (= ad-hoc selection of `{ projectId, reversed }` entries)
   and `bundleOverrides` (= per-key `{ enabled, value }` map for outline
@@ -794,7 +870,12 @@ mainView + mapView + slotEditor + mapMode + export přes jedinou cestu.
   API is intentionally narrow so it can be swapped to IndexedDB without
   touching callers.
 
-### Plánovaná struktura (zakládat až s první funkcí)
+### Plánovaná struktura (PŮVODNÍ SPEC — superseded)
+
+> ⚠️ **Zastaralý plán.** Tahle stromová struktura je z původního specu a NEodpovídá
+> realitě — projekt se vyvinul jinak (viz "Modulová mapa" nahoře, je to zdroj pravdy).
+> Reálně neexistuje `compositor.js` / `variations.js` / Tweakpane `parametersPanel.js`
+> — skládání jede přes PointGraph + render2. Ponecháno jen jako historický kontext.
 
 ```
 core/
@@ -821,7 +902,13 @@ view/
 
 ---
 
-## Datový model — esence
+## Datový model — esence (PŮVODNÍ SPEC — superseded)
+
+> ⚠️ **Zastaralé.** Tohle je původní spec model (quadrant compositor, inputs v projektu,
+> composition/variations rules). Reálný state model je jiný: pool refs A/B + per-slot
+> modifiery (tileOffsets / cutBowOverrides / slotCutTransform / pool overrides) +
+> exportConfig + globalCurve/noiseParams; inputs žijí v global inputs-library (NE v projektu);
+> geometrie přes PointGraph. Viz "Modulová mapa" + controller/state/. Ponecháno jako kontext.
 
 - **Project**: `{ version, metadata, settings: { tileSize, gridSpacing, template, seed }, inputs[], composition, variations }`
 - **InputTile**: `{ id, name, role, layers[] }` — role: `full | empty | edge_h | edge_v | corner_outer | corner_inner | custom`
@@ -831,7 +918,12 @@ view/
 
 ---
 
-## Algoritmus skládání (klíčové)
+## Algoritmus skládání (PŮVODNÍ SPEC — superseded)
+
+> ⚠️ **Zastaralé.** Quadrant-bitmask kompozice níže je z původního specu. Reálně se tile
+> skládá z PointGraphu: pattern (cellShape) → buildPointGraph → ops pipeline → cut path →
+> slotComposite (pool B bg + clipnutý pool A přes buildCutPath). Žádná 4-kvadrant bitmaska.
+> Peering bits pro Godot terrain řeší `view/export/peeringBits.js`. Ponecháno jako kontext.
 
 - **Tile = 4 kvadranty** (TL, TR, BR, BL).
 - 8-bit bitmask (N, NE, E, SE, S, SW, W, NW) → typ každého kvadrantu:
@@ -862,8 +954,9 @@ global panel, font/UI unification — všechno funguje.
    (architecturally distinct layer from per-pool global texture ops).
 4. **Color ramp** (gradient mapping) + **Pattern overlay** — deferred future
    texture ops; both need bespoke UI (gradient editor, cross-input picker).
-5. **`view/mapMode.js` split** (484 lines) — less urgent now that Map tab is
-   DEBUG-only.
+
+(Pozn.: dřívější bod "`view/mapMode.js` split" je hotový — debug mód je
+rozdělený do `view/debug/` subdir, soubor `mapMode.js` už neexistuje.)
 
 **Backlog (otevřená diskuse, ne závazek):**
 - Otevřené body z původního specu (undo/redo, sdílení projektů včetně image
@@ -890,7 +983,6 @@ global panel, font/UI unification — všechno funguje.
 - Paper.js SVG export = neoptimální SVG (zbytečné atributy) → produkce potřebuje SVGO post-process.
 - Anti-aliasing švy na hranicích tiles → `shape-rendering="crispEdges"` nebo rasterizovat tile per tile.
 - Bitmap importy v SVG = velký output → warning při importu velkého obrázku.
-- Tweakpane reactivity: `color` a `point2d` mají speciální handling — RTFM Tweakpane docs.
 
 ---
 
@@ -915,7 +1007,7 @@ Původní renderer (`view/render/` + `core/grid_outline.js` + `core/geometry.js`
 
 **Realizace:**
 - `core/pointGraph/` = nová abstrakce. Point + Connection primitives + build (single/dual) + ops (organic / cornerSoften / inflate / wave / noise / merge).
-- `view/render2/` = renderery nad PointGraphem (composite, outline, cutFill, renderTemplate). Shared napříč mainView / mapView / slotEditor / mapMode / export.
+- `view/render2/` = renderery nad PointGraphem (composite, outline, cutFill, renderTemplate). Shared napříč mainView / mapView / slotEditor / debug / export.
 - `view/cellShapes/` = strategie per template `cellShape`: `square.js` (binární NxN + grid kind + connected saddle) a `triangle.js` (pinwheel — 1×1 slot, 1+N kardinálních wedgeů).
 - Pattern + shape kresba odpojené přes `cellOn` (build pipeline) a `drawCellPattern` (renderer).
 
@@ -966,7 +1058,7 @@ zdroje wasted compute, dohromady drží interactive drag plynulý.
 - Map keyed by slot REF (ne `slot.index` — builtin templaty sdílí refs přes
   `getTemplateById`, takže index by kolidoval mezi default a loaded projektem
   během deserialize). Cache spans listeners jedné state události — všechny
-  views (mainView / mapView / slotEditor / mapMode) sdílí jeden graf per slot.
+  views (mainView / mapView / slotEditor / debug) sdílí jeden graf per slot.
 - Invalidace přes `state.addEventListener` na top-level modulu:
   `template:changed` / `global-curve:changed` / `noise:changed` / `seed:changed`
   / `tile-offsets:changed`. Listeners se registrují **při importu modulu** —
@@ -985,7 +1077,7 @@ zdroje wasted compute, dohromady drží interactive drag plynulý.
   burst (paint drag = 1 event per cell) by jinak rebuildoval všechny
   47 slot graphs × 3 views per click.
 - `templateCreator` necháno bez gate (potřebuje aktualizovat editor grid).
-  `mapMode` + `exportPanel` necháno (mají vlastní `isActive()` guard).
+  debug stage + export panel necháno (mají vlastní `isActive()` guard).
   Lightweight UI sync handlery (`canvasToolbar` / `sourcePanel` / `inputsPanel`)
   necháno (DOM update, ne graph rebuild).
 
@@ -1065,19 +1157,12 @@ Třívrstvá obrana proti burst-painted UI:
    pointerdown / pointerup nad slidery + slot editor canvas. Burst events
    během dragu skipují noise/wave ops; release dispatchne noise:changed →
    full-quality catch-up paint.
-2. **rAF-coalesce** — heavy paint listenery (mainView.refresh,
-   mapView.refresh, slotEditor.paint, texOpsPreview.paint) jsou
-   wrapnuté inline `coalesceRaf(fn)` factory:
-   ```js
-   function coalesceRaf(fn) {
-     let pending = false;
-     return () => { if (pending) return; pending = true;
-       requestAnimationFrame(() => { pending = false; fn(); }); };
-   }
-   ```
-   N dispatchů v jednom tiku (random-all 7×, bundle deserialize loop) =
-   jeden paint per frame, ne N sekvenčních. Stejný pattern už používá
-   view/export/index.js#flushSoon.
+2. **rAF-coalesce** — heavy paint listenery (mainView.refresh, mapView.refresh,
+   slotEditor.paint) jsou wrapnuté sdílenou `coalesceRaf(fn)` factory z
+   **`view/raf.js`** (ne inline kopie — extrahováno do jednoho modulu). N dispatchů
+   v jednom tiku (random-all 7×, bundle deserialize loop) = jeden paint per frame.
+   Stejný pattern používá view/export/index.js#flushSoon; texOpsPreview.paint má
+   vlastní raw requestAnimationFrame (factory neadoptoval).
 3. **mainView wheel/pan handler je preview-mode-only.** `createStage(stageEl,
    { isActive: () => getMode() === "preview" })` — bez tohohle handler
    `preventDefault()`-uje wheel události bublající z bundle/debug/export
@@ -1086,24 +1171,19 @@ Třívrstvá obrana proti burst-painted UI:
 Noise + wave jsou nejdražší ops v `buildSlotGraph` — bez nich je drag slideru
 plynulý, s nimi se zasekává.
 
-- **`view/render2/drawGate.js`** = factory `createDrawGate({ intervalMs })`.
-  Min interval mezi po sobě jdoucími `tryRun() === true` (default 200 ms =
-  5x/sec). Všechny `tryRun` volání v jednom synchronním JS tiku sdílí
-  rozhodnutí (cache invaliduje `queueMicrotask` po skončení dispatch bloku
-  — funguje i pro refreshe trvající >16 ms). Když `tryRun` vrací `false`,
-  scheduleTrailing pošle `setTimeout` co po `intervalMs` zavolá registered
-  trailing handler → ten dispatchne příslušný event a views udělají
-  catch-up refresh s povolenou op.
-- **`noiseGate.js`** + **`waveGate.js`** = tenké wrappery nad factory. Mají
-  vlastní `setEnabled` master switch.
-- **`buildSlotGraph#applyOps`** volá `tryRunNoise()` / `tryRunWave()`.
-  `opts.includeNoise` / `opts.includeWave` (bool) bypassuje gate — PNG/Godot
-  export to nastavuje na `true` pro full-quality output.
-- **`state._renderThrottle`** (default `true`) — jeden user-facing toggle
-  v topbaru ("Throttle rendering"). `main.js#syncGates` ho promítá do obou
-  gate `setEnabled`. Toggle dispatch také force-fire noise:changed +
-  global-curve:changed aby views okamžitě překreslily efekt změny.
-- **Persistuje** jako `settings.renderThrottle`.
+**Throttle mechanismus (jednoduchý check, NE gate-factory):**
+- `buildSlotGraph#applyOps` počítá `const skipHeavy = state.renderThrottle &&
+  isInteracting()`. Když `skipHeavy`, wave i noise se přeskočí. `opts.includeWave`
+  / `opts.includeNoise` (bool) tohle bypassují — PNG/Godot export je nastaví na
+  `true` pro full-quality output.
+- **`state._renderThrottle`** (default `true`) — jeden user-facing toggle v topbaru
+  ("Throttle rendering"). Při přepnutí `main.js` force-fire `noise:changed`, aby
+  views okamžitě překreslily efekt změny. Persistuje jako `settings.renderThrottle`.
+
+> **Historie:** dřívější `drawGate.js` / `noiseGate.js` / `waveGate.js` (časovaná
+> factory `createDrawGate` + `tryRunNoise`/`tryRunWave` + `setEnabled` +
+> `main.js#syncGates`) byly ODSTRANĚNY a nahrazeny výše popsaným
+> `renderThrottle && isInteracting()` checkem. Tyto soubory už neexistují.
 
 ---
 
@@ -1124,7 +1204,7 @@ plynulý, s nimi se zasekává.
     `build` (=light) / `build-min` / `build-light` / `build-heavy` /
     `serve` (lokální http na :8000) / `clean`. Úroveň obfuskace = env
     `OBFUSCATE=none|light|heavy` v `build.sh`.
-- **Žádný framework** (React/Vue/Svelte). Vanilla + Paper.js + Tweakpane.
+- **Žádný framework** (React/Vue/Svelte). Vanilla JS + Paper.js + vlastní UI panely (žádný Tweakpane).
 - **Core = pure functions.** Pokud něco v `core/*` sahá na DOM nebo globální state, je to bug.
 - **Cross-modul komunikace přes StateController events**, ne přímé volání.
 - **Standard JS conventions** — žádný "Godot styl" sem netaháme.
