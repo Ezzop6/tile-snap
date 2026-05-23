@@ -46,6 +46,23 @@ export function initSourcePanel() {
       if (e.key === "Escape") { inp.value = state.poolName(key) || ""; inp.blur(); }
     });
   }
+  // Resolution select (render + export tile size, applies to preview AND
+  // export). Options rebuilt whenever the auto value (= largest source) or the
+  // stored value changes.
+  const resSel = document.getElementById("source-resolution");
+  if (resSel) {
+    syncResolutionSelect();
+    resSel.addEventListener("change", () => {
+      const v = resSel.value;
+      state.setExportResolution(v === "" ? null : parseInt(v, 10));
+    });
+    state.addEventListener("export-resolution:changed", syncResolutionSelect);
+    state.addEventListener("pools:changed",  syncResolutionSelect);
+    state.addEventListener("input:updated",  syncResolutionSelect);
+    state.addEventListener("input:removed",  syncResolutionSelect);
+    state.addEventListener("project:loaded", syncResolutionSelect);
+  }
+
   // Project load / swap can change pool names — keep inputs in sync.
   state.addEventListener("pool-names:changed", () => {
     for (const key of ["A", "B"]) {
@@ -81,6 +98,19 @@ function ensureNameSuggestList() {
     document.body.appendChild(dl);
   }
   return dl;
+}
+
+// Rebuild the resolution <select>: Auto (= live largest-source size) + presets,
+// plus the current value if it isn't a preset (e.g. an odd source size).
+function syncResolutionSelect() {
+  const sel = document.getElementById("source-resolution");
+  if (!sel) return;
+  const cur = state.exportResolution; // null = auto, else px
+  const presets = [16, 32, 48, 64, 96, 128, 256];
+  const sizes = (cur == null || presets.includes(cur)) ? presets : [...presets, cur].sort((a, b) => a - b);
+  const opts = [`<option value=""${cur == null ? " selected" : ""}>Auto (${state.nativeSlotSize} px)</option>`];
+  for (const n of sizes) opts.push(`<option value="${n}"${cur === n ? " selected" : ""}>${n} px</option>`);
+  sel.innerHTML = opts.join("");
 }
 
 function refreshNameSuggestions(dl) {

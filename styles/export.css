@@ -183,6 +183,12 @@
    Outline (= contrast frame) reads on any tile colour; "on" cells use
    the per-group hue so the marker doubles as a colour-coded slot
    identifier + a glance-readable pattern preview. */
+/* Single atlas canvas behind the interactive cells. pointer-events:none so
+   clicks fall through to the transparent .layout-tile divs on top. */
+.layout-atlas {
+  display: block;
+  pointer-events: none;
+}
 .tile-group-marker {
   position: relative;
   pointer-events: none;
@@ -190,9 +196,11 @@
   display: grid;
   justify-self: end;
   align-self: start;
-  margin: 2px;
-  width: 16px;
-  height: 16px;
+  /* Fraction of the cell (cell size = export resolution, so it varies) — keeps
+     the marker proportional to the tile instead of a fixed 16px. */
+  margin: 4%;
+  width: 26%;
+  height: 26%;
   background: rgba(0, 0, 0, 0.65);
   outline: 1px solid #000;
   outline-offset: -1px;

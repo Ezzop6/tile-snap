@@ -15,10 +15,11 @@ export function createStage(stageEl, opts = {}) {
   let content   = null;
   let contentW  = 0;
   let contentH  = 0;
-  let zoom      = 1;
   let fitScale  = 1;
-  let offsetX   = 0;
-  let offsetY   = 0;
+  // User transform (zoom multiplier + pan offset). Shared across stages when
+  // o.shared is given so the view persists across Preview/Export/Debug
+  // switches; fitScale stays per-stage (content-size dependent).
+  const tx = o.shared ? o.shared.state : { zoom: 1, offsetX: 0, offsetY: 0 };
   let panning   = false;
   let panButton = -1;
   let suppressClick = false;
@@ -29,9 +30,17 @@ export function createStage(stageEl, opts = {}) {
 
   function applyTransform() {
     if (!content) return;
-    const s = fitScale * zoom;
-    content.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${s})`;
+    const s = fitScale * tx.zoom;
+    content.style.transform = `translate(${tx.offsetX}px, ${tx.offsetY}px) scale(${s})`;
     for (const cb of transformSubs) cb();
+  }
+
+  // Commit a user-transform change. When shared, notify every stage so the
+  // hidden ones stay in sync (correct on the next mode switch); the notify
+  // re-runs this stage's applyTransform too. Unshared = just apply locally.
+  function commit() {
+    if (o.shared) o.shared.notify();
+    else applyTransform();
   }
 
   function computeFitScale() {
@@ -59,8 +68,8 @@ export function createStage(stageEl, opts = {}) {
     }
     const dir    = e.deltaY < 0 ? +1 : -1;
     const factor = dir > 0 ? o.wheelStep : 1 / o.wheelStep;
-    zoom = clamp(zoom * factor, o.minZoom, o.maxZoom);
-    applyTransform();
+    tx.zoom = clamp(tx.zoom * factor, o.minZoom, o.maxZoom);
+    commit();
   }
 
   // Pan gestures: middle-mouse OR Ctrl+Left. Middle stays as a power-user
@@ -79,16 +88,16 @@ export function createStage(stageEl, opts = {}) {
     panButton = e.button;
     panStartX = e.clientX;
     panStartY = e.clientY;
-    panStartOffsetX = offsetX;
-    panStartOffsetY = offsetY;
+    panStartOffsetX = tx.offsetX;
+    panStartOffsetY = tx.offsetY;
     stageEl.style.cursor = "grabbing";
   }
 
   function onMouseMove(e) {
     if (!panning) return;
-    offsetX = panStartOffsetX + (e.clientX - panStartX);
-    offsetY = panStartOffsetY + (e.clientY - panStartY);
-    applyTransform();
+    tx.offsetX = panStartOffsetX + (e.clientX - panStartX);
+    tx.offsetY = panStartOffsetY + (e.clientY - panStartY);
+    commit();
   }
 
   function onMouseUp(e) {
@@ -124,6 +133,8 @@ export function createStage(stageEl, opts = {}) {
 
   const resizeObserver = new ResizeObserver(refit);
   resizeObserver.observe(stageEl);
+  // Re-apply when another stage changes the shared transform.
+  const unsubShared = o.shared ? o.shared.subscribe(applyTransform) : null;
 
   return {
     setContent(el) {
@@ -140,13 +151,13 @@ export function createStage(stageEl, opts = {}) {
       refit();
     },
     resetView() {
-      zoom = 1;
-      offsetX = 0;
-      offsetY = 0;
-      applyTransform();
+      tx.zoom = 1;
+      tx.offsetX = 0;
+      tx.offsetY = 0;
+      commit();
     },
     refit,
-    displayScale: () => fitScale * zoom,
+    displayScale: () => fitScale * tx.zoom,
     // Fires on every transform change (pan / zoom / fit / reset) so screen-
     // space overlays (e.g. the selection frame) can reposition. Returns an
     // unsubscribe fn.
@@ -161,7 +172,7 @@ export function createStage(stageEl, opts = {}) {
     clientToContent(clientX, clientY) {
       if (!content) return null;
       const rect = content.getBoundingClientRect();
-      const s = fitScale * zoom;
+      const s = fitScale * tx.zoom;
       return { x: (clientX - rect.left) / s, y: (clientY - rect.top) / s };
     },
     destroy() {
@@ -172,6 +183,7 @@ export function createStage(stageEl, opts = {}) {
       window.removeEventListener("mousemove",  onMouseMove);
       window.removeEventListener("mouseup",    onMouseUp);
       resizeObserver.disconnect();
+      if (unsubShared) unsubShared();
     },
   };
 }

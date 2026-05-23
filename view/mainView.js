@@ -6,7 +6,8 @@
 import { state } from "../controller/state.js";
 import { applyRenderModeClass } from "./projectBar.js";
 import { createStage } from "./stage.js";
-import { getMode } from "./modeTabs.js";
+import { sharedTransform } from "./sharedTransform.js";
+import { getMode, onModeChange } from "./modeTabs.js";
 import { gateRefreshDuringTemplateMode } from "./viewRefreshGate.js";
 import {
   buildSlotGraph,
@@ -37,6 +38,7 @@ export function initMainView() {
   stage = createStage(stageEl, {
     fitToContent: true,
     zoomOrigin:   "center",
+    shared:       sharedTransform,
     // Gate wheel + pan handlers to preview-only modes. Without this,
     // mainView's wheel handler calls preventDefault on every mode that
     // shares #main-stage (bundle / debug / export / creator) and
@@ -50,6 +52,9 @@ export function initMainView() {
   // is sized at. Repositions itself on pan/zoom via stage.onTransform.
   selectionOverlay = createSelectionOverlay(stageEl, stage);
   selectionOverlay.setTracker(() => {
+    // #main-stage stays in the DOM across modes, so gate on preview mode —
+    // otherwise this frame ghosts on top of the export/debug stages.
+    if (getMode() !== "preview") return null;
     const t = state.template;
     const idx = state.selectedSlotIndex;
     if (!t || idx == null) return null;
@@ -59,6 +64,8 @@ export function initMainView() {
     return slotClientRect(canvas, contentW, contentH,
       slot.col * step, slot.row * step, currentSlotSize, currentSlotSize);
   });
+  // Hide/show the frame when entering/leaving preview mode.
+  onModeChange(() => selectionOverlay?.refresh());
 
   canvas.addEventListener("click", onClick);
 
@@ -82,6 +89,7 @@ export function initMainView() {
   state.addEventListener("render-mode:changed",        gated);
   state.addEventListener("noise:changed",              gated);
   state.addEventListener("seed:changed",               gated);
+  state.addEventListener("export-resolution:changed",  gated);
 
   refresh();
 }
@@ -103,7 +111,10 @@ function refresh() {
   const mode = state.renderMode === "pixel" ? "pixel" : "smooth";
   const snap = mode === "pixel";
 
-  currentSlotSize = state.nativeSlotSize;
+  // Unified render+export resolution (set in the Sources header). Preview and
+  // export render at the same size → pixel-identical. exportSlotSize = the
+  // chosen value, or auto (largest source) when unset.
+  currentSlotSize = state.exportSlotSize;
   const cols = t.cols, rows = t.rows;
   const widthPx  = cols * currentSlotSize + (cols - 1) * SLOT_GAP;
   const heightPx = rows * currentSlotSize + (rows - 1) * SLOT_GAP;

@@ -3,6 +3,7 @@ import { onModeChange, getMode } from "../modeTabs.js";
 import { drawGraph } from "../render2/drawGraph.js";
 import { buildSlotGraph } from "../render2/buildSlotGraph.js";
 import { createStage } from "../stage.js";
+import { sharedTransform } from "../sharedTransform.js";
 import { createSelectionOverlay, slotClientRect } from "../selectionFrame.js";
 import {
   isLayerActive, getActiveLayers, onLayersChange, setCopyHandler,
@@ -36,6 +37,7 @@ export function initDebugMode() {
     fitToContent: true,
     zoomOrigin:   "center",
     isActive,
+    shared:       sharedTransform,
   });
   dbgState.stage.setContent(dbgState.canvasEl);
 

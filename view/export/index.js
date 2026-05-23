@@ -10,6 +10,7 @@ import { runJsonExport } from "./jsonExport.js";
 import { runZipExport } from "./zipExport.js";
 import { settings } from "../../controller/storage.js";
 import { createStage } from "../stage.js";
+import { sharedTransform } from "../sharedTransform.js";
 import { createSelectionOverlay } from "../selectionFrame.js";
 
 const EXPORT_MODE_KEY = "exportMode";
@@ -135,9 +136,10 @@ export function initExportPanel() {
   const stageEl = document.getElementById("export-stage");
   if (stageEl) {
     xs.stage = createStage(stageEl, {
-      fitToContent: false,
+      fitToContent: true,
       zoomOrigin:   "center",
       isActive,
+      shared:       sharedTransform,
     });
     // Shared screen-space selection frame (same as preview + debug). Tracks
     // the selected tile's on-screen rect, so it's one thin crisp line of

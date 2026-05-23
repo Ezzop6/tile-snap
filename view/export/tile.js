@@ -11,8 +11,10 @@ import {
   drawOutline,
 } from "../render2/index.js";
 
-export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
-  const nat = state.exportSlotSize;
+// Render ONE tile (master or variant) into ctx at `origin`, sized `size`.
+// Shared by the export layout's single atlas canvas + the right-panel
+// preview's single-tile canvas, so both match the PNG exactly.
+export function drawTileInto(ctx, slot, isVariant, variantIdx, origin, size) {
   const ov = isVariant ? buildVariantOverride(slot.index, variantIdx) : null;
   const noiseOverride = state.exportShowIslands
     ? (ov?.noise || null)
@@ -20,19 +22,6 @@ export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
         A: { ...(ov?.noise?.A || {}), enabled: false },
         B: { ...(ov?.noise?.B || {}), enabled: false },
       };
-
-  const canvas = document.createElement("canvas");
-  canvas.className = "layout-tile" + (isVariant ? " is-variant" : "");
-  canvas.width  = nat;
-  canvas.height = nat;
-  canvas.style.width  = `${LAYOUT_TILE_DISPLAY_PX}px`;
-  canvas.style.height = `${LAYOUT_TILE_DISPLAY_PX}px`;
-  applyRenderModeClass(canvas);
-  canvas.dataset.slotIndex   = String(slot.index);
-  canvas.dataset.variantIdx  = String(isVariant ? variantIdx : 0);
-
-  const ctx = canvas.getContext("2d");
-  const origin = { x: 0, y: 0 };
   const graph = buildSlotGraph(slot, {
     curveOverride: ov?.curve || null,
     noiseOverride,
@@ -48,39 +37,40 @@ export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
       if (slotOv[key] != null) return state.poolAt(key, slotOv[key]);
       return state.master(key);
     };
-    drawSlotComposite(ctx, slot, graph, origin, nat, {
+    drawSlotComposite(ctx, slot, graph, origin, size, {
       mode:        state.renderMode,
       sourceARef:  pickSide("A"),
       sourceBRef:  pickSide("B"),
     });
-    drawOutline(ctx, graph, origin, nat, { snap: state.renderMode === "pixel" });
+    drawOutline(ctx, graph, origin, size, { snap: state.renderMode === "pixel" });
   } else {
-    drawCutStroke(ctx, graph, origin, nat, { snap: state.renderMode === "pixel" });
+    drawCutStroke(ctx, graph, origin, size, { snap: state.renderMode === "pixel" });
   }
-  return canvas;
 }
 
-// Source tile rendered into a layout-tile canvas for the "Bundle source
-// tiles" rows. Goes through the active pool's texture-ops chain so the
-// bundled bitmap exactly matches what the export PNG (and the main
-// canvas) draw — autoTileable / boundarySnap / colorAdjust / etc.
-// applied to the pool that owns this entry.
-export function buildSourceBlock(entry) {
+// Single-tile canvas for the right-panel preview (one tile → no seams).
+export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
   const nat = state.exportSlotSize;
   const canvas = document.createElement("canvas");
-  canvas.className = "layout-tile is-source";
+  canvas.className = "layout-tile" + (isVariant ? " is-variant" : "");
   canvas.width  = nat;
   canvas.height = nat;
   canvas.style.width  = `${LAYOUT_TILE_DISPLAY_PX}px`;
   canvas.style.height = `${LAYOUT_TILE_DISPLAY_PX}px`;
   applyRenderModeClass(canvas);
-  const ctx = canvas.getContext("2d");
-  if (entry?.tile?.canvas) {
-    const processed = applyPoolTextureOps(entry.tile.canvas, entry.key);
-    ctx.drawImage(processed, 0, 0, processed.width, processed.height,
-                  0, 0, nat, nat);
-  }
+  canvas.dataset.slotIndex   = String(slot.index);
+  canvas.dataset.variantIdx  = String(isVariant ? variantIdx : 0);
+  drawTileInto(canvas.getContext("2d"), slot, isVariant, variantIdx, { x: 0, y: 0 }, nat);
   return canvas;
+}
+
+// Draw a bundled source tile into ctx at `origin`/`size`. Goes through the
+// active pool's texture-ops chain so it matches the PNG + main canvas.
+export function drawSourceInto(ctx, entry, origin, size) {
+  if (!entry?.tile?.canvas) return;
+  const processed = applyPoolTextureOps(entry.tile.canvas, entry.key);
+  ctx.drawImage(processed, 0, 0, processed.width, processed.height,
+                origin.x, origin.y, size, size);
 }
 
 // Chain the registry's bitmap preprocessors for the given pool. Same

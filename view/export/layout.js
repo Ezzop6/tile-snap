@@ -1,6 +1,7 @@
 import { state } from "../../controller/state.js";
-import { xs, LAYOUT_TILE_DISPLAY_PX } from "./_state.js";
-import { buildSlotBlock, buildSourceBlock } from "./tile.js";
+import { applyRenderModeClass } from "../projectBar.js";
+import { xs } from "./_state.js";
+import { drawTileInto, drawSourceInto } from "./tile.js";
 
 function buildPatternMarker(slot, color, col, row) {
   const arr = slot.array;
@@ -46,33 +47,54 @@ export function renderLayout() {
 
   const totalRows = layout.outRows + sourceLayout.totalRows;
 
-  // Single CSS grid so column rhythm is shared (no per-region drift).
+  // Cell size = export resolution → the atlas canvas is 1:1 (backing == CSS)
+  // and the stage scales it ONCE, exactly like the preview/PNG. Replaces the
+  // old per-tile canvases (downsampled to 64 then re-zoomed = double-scale +
+  // subpixel seams between separate canvases).
+  const cell = state.exportSlotSize;
+
   const grid = document.createElement("div");
   grid.className = "layout-grid__full";
-  grid.style.gridTemplateColumns = `repeat(${layout.outCols}, ${LAYOUT_TILE_DISPLAY_PX}px)`;
-  grid.style.gridTemplateRows    = `repeat(${totalRows}, ${LAYOUT_TILE_DISPLAY_PX}px)`;
+  grid.style.gridTemplateColumns = `repeat(${layout.outCols}, ${cell}px)`;
+  grid.style.gridTemplateRows    = `repeat(${totalRows}, ${cell}px)`;
 
-  // Sibling marker div: a small N×M square mirroring slot.array, where
-  // "on" cells get the group hue and the outline is a high-contrast frame
-  // so the marker stays readable on any tile colour. Canvas doesn't
-  // support ::after, hence the separate div.
+  // ONE seamless atlas canvas spanning the whole grid, behind the interactive
+  // cells + markers. Every tile is drawn into it at its cell position.
+  const atlas = document.createElement("canvas");
+  atlas.className = "layout-atlas";
+  atlas.width  = layout.outCols * cell;
+  atlas.height = totalRows * cell;
+  atlas.style.width  = `${layout.outCols * cell}px`;
+  atlas.style.height = `${totalRows * cell}px`;
+  atlas.style.gridColumn = "1 / -1";
+  atlas.style.gridRow    = "1 / -1";
+  applyRenderModeClass(atlas);
+  const actx = atlas.getContext("2d"); // draw-only → GPU backing (no readback)
+  grid.appendChild(atlas);
+
+  // Transparent positioning cell = click target (data attrs for selection) +
+  // optional group marker. The visual lives in the atlas behind it. Marker is
+  // a small N×M square mirroring slot.array; "on" cells get the group hue.
   const slotByIdx = new Map(t.slots.map((s) => [s.index, s]));
-  const placeTile = (block, col, row, slotIdx /* , isSelected */) => {
-    block.style.gridColumn = String(col + 1);
-    block.style.gridRow    = String(row + 1);
-    grid.appendChild(block);
-    // Selection frame is now the shared screen-space overlay (tracks the
-    // selected tile element) — see view/selectionFrame.js + index.js.
-    if (!state.exportShowGroups) return;
+  const placeCell = (col, row, slotIdx, variantIdx, extraClass) => {
+    const div = document.createElement("div");
+    div.className = "layout-tile" + (extraClass ? " " + extraClass : "");
+    div.style.gridColumn = String(col + 1);
+    div.style.gridRow    = String(row + 1);
+    if (slotIdx != null) {
+      div.dataset.slotIndex  = String(slotIdx);
+      div.dataset.variantIdx = String(variantIdx);
+    }
+    grid.appendChild(div);
+    if (slotIdx == null || !state.exportShowGroups) return;
     const color = colorBySlotIdx.get(slotIdx);
     const slot  = slotByIdx.get(slotIdx);
-    if (!color || !slot) return;
-    grid.appendChild(buildPatternMarker(slot, color, col, row));
+    if (color && slot) grid.appendChild(buildPatternMarker(slot, color, col, row));
   };
 
   for (const slot of t.slots) {
-    const block = buildSlotBlock(slot, /*isVariant*/ false);
-    placeTile(block, slot.col, slot.row, slot.index);
+    drawTileInto(actx, slot, false, 0, { x: slot.col * cell, y: slot.row * cell }, cell);
+    placeCell(slot.col, slot.row, slot.index, 0);
   }
 
   for (let gi = 0; gi < layout.groups.length; gi++) {
@@ -80,22 +102,23 @@ export function renderLayout() {
     const slot = slotsWithVariants[gi];
     const count = state.getExportVariantCount(slot.index);
     for (let v = 1; v < count; v++) {
-      const block = buildSlotBlock(slot, /*isVariant*/ true, v);
       const { col, row } = variantCellInGroup(g, v - 1);
-      placeTile(block, col, row, slot.index);
+      drawTileInto(actx, slot, true, v, { x: col * cell, y: row * cell }, cell);
+      placeCell(col, row, slot.index, v, "is-variant");
     }
   }
 
-  // Bundled source tiles: rendered as raw pool tile canvases so the user
-  // sees exactly which inputs land where in the exported PNG.
+  // Bundled source tiles below the atlas grid.
   for (const entry of sourceLayout.entries) {
-    const block = buildSourceBlock(entry);
-    placeTile(block, entry.col, entry.row, null);
+    drawSourceInto(actx, entry, { x: entry.col * cell, y: entry.row * cell }, cell);
+    placeCell(entry.col, entry.row, null, 0, "is-source");
   }
 
   xs.layoutEl.appendChild(grid);
   // Re-mount so the stage transform (CSS on mounted element) survives re-renders.
   xs.stage?.setContent(grid);
+  // Grid CSS size drives fit-to-content (so export zoom matches preview/debug).
+  xs.stage?.setContentSize(layout.outCols * cell, totalRows * cell);
   // Reposition the shared selection overlay over the (re-created) selected tile.
   xs.selectionOverlay?.refresh();
 }
