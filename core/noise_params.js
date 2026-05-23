@@ -35,9 +35,12 @@ export function defaultNoiseParams() {
   return out;
 }
 
-// Logarithmic mapping feels more linear than a straight lerp.
-// slider 0 -> period ~256 px (huge blobs), slider 1 -> ~16 px (tight grain).
+// Logarithmic mapping, recalibrated + oriented so the slider reads intuitively:
+// scale UP = bigger zones. slider 0 -> period 16 px (fine grain, ~4 features
+// per slot), slider 1 -> 64 px (large zones, ~1 per slot). The old coarse end
+// (period >64 = a single near-flat blob over half the slot) is dropped — it
+// was useless as a mask.
 export function scaleToPeriodPx(scale01) {
   const s = Math.max(0, Math.min(1, scale01));
-  return 256 / Math.pow(16, s);
+  return 16 * Math.pow(4, s);
 }

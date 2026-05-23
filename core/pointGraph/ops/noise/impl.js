@@ -23,8 +23,12 @@ export function noiseImpl(graph, opts = {}) {
     seed,
   );
 
+  // Boundary segments drive both the cut-region pre-mask and the edge fade —
+  // collect once and share (walking every connection twice was wasteful).
+  const segments = collectBoundarySegments(graph);
+
   const wantInside = params.side === "holes";
-  preMaskByCutRegion(mask, graph, wantInside);
+  preMaskByCutRegion(mask, segments, wantInside);
 
   // Edge-aware fade: noise weakens near the cut/closure boundary so noise
   // islands sit deeper in the region and the cut edge reads clean. Default
@@ -32,7 +36,7 @@ export function noiseImpl(graph, opts = {}) {
   if (params.edgeFade > 0) {
     const cols = Math.max(1, graph.meta.cols || 1);
     const fadePx = params.edgeFade * (size / cols);
-    applyEdgeFade(mask, collectBoundarySegments(graph), fadePx);
+    applyEdgeFade(mask, segments, fadePx);
   }
 
   const loops = traceLoops(mask);
@@ -49,8 +53,7 @@ export function noiseImpl(graph, opts = {}) {
   return graph;
 }
 
-function preMaskByCutRegion(mask, graph, wantInside) {
-  const segments = collectBoundarySegments(graph);
+function preMaskByCutRegion(mask, segments, wantInside) {
   const { cols, rows, data, cell, origin } = mask;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -146,11 +149,18 @@ function traceLoops(mask) {
   }
   if (!edges.length) return [];
 
-  // Endpoints are produced by identical xm/ym arithmetic for shared
-  // cell edges → exact string keys, no FP tolerance needed.
+  // Endpoints sit exactly on the half-cell grid (x0/xm/xr, y0/ym/yb), so map
+  // each to integer grid indices for an allocation-free numeric Map key —
+  // replaces per-endpoint toFixed + string concat. Identical arithmetic on
+  // shared cell edges still collides exactly, no FP tolerance needed.
+  const half   = cell * 0.5;
+  const stride = 2 * cols + 2;
+  const key = (x, y) =>
+    Math.round((y - origin.y) / half) * stride + Math.round((x - origin.x) / half);
+
   const startMap = new Map();
   for (let i = 0; i < edges.length; i++) {
-    startMap.set(keyOf(edges[i][0], edges[i][1]), i);
+    startMap.set(key(edges[i][0], edges[i][1]), i);
   }
 
   const used = new Uint8Array(edges.length);
@@ -160,20 +170,15 @@ function traceLoops(mask) {
     const loop = [];
     let cur = i;
     let safety = edges.length + 1;
-    while (cur !== undefined && cur !== -1 && !used[cur] && safety-- > 0) {
+    while (cur !== -1 && !used[cur] && safety-- > 0) {
       used[cur] = 1;
       loop.push([edges[cur][0], edges[cur][1]]);
-      const nextKey = keyOf(edges[cur][2], edges[cur][3]);
-      const nextIdx = startMap.get(nextKey);
+      const nextIdx = startMap.get(key(edges[cur][2], edges[cur][3]));
       cur = nextIdx === undefined ? -1 : nextIdx;
     }
     if (loop.length >= MIN_LOOP_VERTICES) loops.push(loop);
   }
   return loops;
-}
-
-function keyOf(x, y) {
-  return `${x.toFixed(3)}|${y.toFixed(3)}`;
 }
 
 function addLoopAsChain(graph, loop, chainId, interiorSide) {

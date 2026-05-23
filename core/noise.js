@@ -12,16 +12,24 @@ const HARD_EDGE_FRAC = 0.05;
 // project's default tile size which keeps slider tunings intuitive.
 const REFERENCE_SLOT_SIZE = 64;
 
-let _simplex = null;
-let _simplexSeed = null;
+// One paint mixes several seeds in quick succession (noise A = seed, noise B =
+// seed+9973, wave = seed + seed+1), so a single-entry memo thrashed and rebuilt
+// the simplex (512-entry permutation tables) ~per slot per layer. A small LRU
+// keyed by seed keeps every seed used in a paint warm → built once, not ~140×.
+const _simplexCache = new Map();
+const SIMPLEX_CACHE_MAX = 8;
 
 function getSimplex(seed) {
-  if (_simplex && _simplexSeed === seed) return _simplex;
+  const cached = _simplexCache.get(seed);
+  if (cached) return cached;
   const ctor = window.SimplexNoise;
   if (!ctor) throw new Error("simplex-noise library not loaded");
-  _simplex = new ctor(String(seed));
-  _simplexSeed = seed;
-  return _simplex;
+  const inst = new ctor(String(seed));
+  _simplexCache.set(seed, inst);
+  if (_simplexCache.size > SIMPLEX_CACHE_MAX) {
+    _simplexCache.delete(_simplexCache.keys().next().value);
+  }
+  return inst;
 }
 
 // Samplers: (simplex, x, y) -> value in [-1, +1] so threshold compares uniformly.
@@ -98,8 +106,13 @@ export function buildNoiseMask(slotCol, slotRow, origin, size, params, seed) {
   const sampler = SAMPLERS[params.type] || SAMPLERS.simplex;
   const periodPx = Math.max(1, scaleToPeriodPx(params.scale));
   const freq = 1 / periodPx;
-  // density 0..1 maps inversely to threshold in [-1, +1].
-  const threshold = 1 - 2 * Math.max(0, Math.min(1, params.density));
+  // Mask-calibrated density: slider 0..1 → threshold 0.9..0, i.e. ~0%..~50%
+  // coverage. 50% is the practical max for a mask (beyond that the region is
+  // more carved away than kept). Simplex clusters near 0, so threshold 0 ≈ 50%
+  // coverage and the mapping spends most travel in the sparse zone where masks
+  // actually live.
+  const d = Math.max(0, Math.min(1, params.density));
+  const threshold = 0.9 * (1 - d);
 
   const cols = Math.ceil(size.w / SAMPLE_PX) + 1;
   const rows = Math.ceil(size.h / SAMPLE_PX) + 1;
@@ -132,92 +145,6 @@ export function buildNoiseMask(slotCol, slotRow, origin, size, params, seed) {
   return { cols, rows, data, values, threshold, cell: SAMPLE_PX, origin };
 }
 
-// Holes inside larger regions emit as separate paths; the caller decides
-// whether they become CompoundPath holes ("holes") or additional positive
-// regions ("patches").
-export function maskToContours(mask) {
-  const paper = window.paper;
-  if (!paper) throw new Error("paper.js not loaded");
-  const { cols, rows, data, cell, origin } = mask;
-
-  const edges = [];
-
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const tl = data[r * cols + c];
-      const tr = data[r * cols + c + 1];
-      const bl = data[(r + 1) * cols + c];
-      const br = data[(r + 1) * cols + c + 1];
-      const code = (tl << 3) | (tr << 2) | (br << 1) | bl;
-      const x0 = origin.x + c * cell;
-      const y0 = origin.y + r * cell;
-      const xm = x0 + cell / 2;
-      const ym = y0 + cell / 2;
-      const xr = x0 + cell;
-      const yb = y0 + cell;
-      // Marching squares case table: edges directed so island (1) is on the LEFT.
-      switch (code) {
-        case 0:  /* 0000 */ break;
-        case 1:  /* 0001 */ edges.push({ from: [x0, ym], to: [xm, yb] }); break;
-        case 2:  /* 0010 */ edges.push({ from: [xm, yb], to: [xr, ym] }); break;
-        case 3:  /* 0011 */ edges.push({ from: [x0, ym], to: [xr, ym] }); break;
-        case 4:  /* 0100 */ edges.push({ from: [xr, ym], to: [xm, y0] }); break;
-        case 5:  /* 0101 saddle */
-          edges.push({ from: [x0, ym], to: [xm, y0] });
-          edges.push({ from: [xr, ym], to: [xm, yb] });
-          break;
-        case 6:  /* 0110 */ edges.push({ from: [xm, yb], to: [xm, y0] }); break;
-        case 7:  /* 0111 */ edges.push({ from: [x0, ym], to: [xm, y0] }); break;
-        case 8:  /* 1000 */ edges.push({ from: [xm, y0], to: [x0, ym] }); break;
-        case 9:  /* 1001 */ edges.push({ from: [xm, y0], to: [xm, yb] }); break;
-        case 10: /* 1010 saddle */
-          edges.push({ from: [xm, y0], to: [xr, ym] });
-          edges.push({ from: [xm, yb], to: [x0, ym] });
-          break;
-        case 11: /* 1011 */ edges.push({ from: [xm, y0], to: [xr, ym] }); break;
-        case 12: /* 1100 */ edges.push({ from: [xr, ym], to: [x0, ym] }); break;
-        case 13: /* 1101 */ edges.push({ from: [xr, ym], to: [xm, yb] }); break;
-        case 14: /* 1110 */ edges.push({ from: [xm, yb], to: [x0, ym] }); break;
-        case 15: /* 1111 */ break;
-      }
-    }
-  }
-
-  // Endpoints compare exactly: same xm/ym arithmetic for shared cell edges, no FP tolerance needed.
-  const startMap = new Map();
-  for (const e of edges) startMap.set(keyOf(e.from), e);
-
-  const loops = [];
-  const used = new Set();
-  for (let i = 0; i < edges.length; i++) {
-    if (used.has(i)) continue;
-    const loop = [];
-    let cur = edges[i];
-    let safety = edges.length + 1;
-    while (cur && safety-- > 0) {
-      const idx = edges.indexOf(cur);
-      if (used.has(idx)) break;
-      used.add(idx);
-      loop.push(cur.from);
-      cur = startMap.get(keyOf(cur.to));
-    }
-    if (loop.length >= 3) loops.push(loop);
-  }
-
-  return loops.map(loop => {
-    const path = new paper.Path({
-      segments: loop.map(([x, y]) => new paper.Point(x, y)),
-      closed: true,
-      insert: false,
-    });
-    return path;
-  });
-}
-
-function keyOf([x, y]) {
-  return `${x.toFixed(3)}|${y.toFixed(3)}`;
-}
-
 // Edge-aware fade: noise weakens near the boundary by raising the
 // effective threshold. At distance >= fadePx the cell uses the normal
 // density threshold; at the edge (d=0) the threshold is bumped all the
@@ -244,10 +171,4 @@ export function applyEdgeFade(mask, segments, fadePx) {
       if (v <= effective) data[idx] = 0;
     }
   }
-}
-
-export function buildNoiseIslands(slot, origin, size, params, seed) {
-  const mask = buildNoiseMask(slot.col, slot.row, origin, size, params, seed);
-  const contours = maskToContours(mask);
-  return { mask, contours };
 }

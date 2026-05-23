@@ -105,10 +105,13 @@ export function initNoisePanel() {
       resetLayer(layer);
       return;
     }
+    if (action === "random-layer") {
+      randomLayer(layer);
+      return;
+    }
     const key = btn.dataset.noiseKey;
     if (!key || !NOISE_LAYER_PARAMS[key]) return;
-    if (action === "reset")  applyReset(layer, key);
-    if (action === "random") applyRandom(layer, key);
+    if (action === "reset") applyReset(layer, key);
   });
 
   function syncAll() {
@@ -153,6 +156,14 @@ function resetLayer(layer) {
   const defaults = defaultNoiseLayer();
   for (const key of Object.keys(defaults)) {
     state.setNoiseLayerParam(layer, key, defaults[key]);
+  }
+}
+
+// Randomize the whole layer in one go (replaces the per-value 🎲). Touches the
+// noise character params (type + density + scale + edgeFade) but not `enabled`.
+function randomLayer(layer) {
+  for (const key of Object.keys(NOISE_LAYER_PARAMS)) {
+    applyRandom(layer, key);
   }
 }
 
