@@ -363,6 +363,23 @@ export function cleanOrphanImageBinaries() {
   return { count: orphans.length, freedBytes: freed };
 }
 
+// Distinct, non-empty pool (terrain) names the user has used across every
+// saved project — drives autocomplete suggestions when naming pools so the
+// same terrain vocabulary ("grass", "dirt", …) is reusable across projects.
+export function collectPoolNames() {
+  const names = new Set();
+  const ids = readManifest(KEY_PROJECT_MANIFEST);
+  for (const id of ids) {
+    const pn = readJSON(KEY_PROJECT(id))?.data?.poolNames;
+    if (!pn || typeof pn !== "object") continue;
+    for (const k of ["A", "B"]) {
+      const v = (pn[k] || "").trim();
+      if (v) names.add(v);
+    }
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
 export const settings = {
   get(key, defaultValue = null) {
     const v = readJSON(KEY_SETTING(key));

@@ -1,4 +1,5 @@
 import { state } from "../controller/state.js";
+import { collectPoolNames } from "../controller/storage.js";
 
 let rowEls = null;
 
@@ -27,10 +28,18 @@ export function initSourcePanel() {
   a.addEventListener("click", (e) => onPoolClick(e, "A"));
   b.addEventListener("click", (e) => onPoolClick(e, "B"));
 
+  // Autocomplete pool names from the terms the user has already used in
+  // other projects (+ the current session's names), rebuilt on focus so it
+  // stays current after saving / loading other projects.
+  const suggestList = ensureNameSuggestList();
+  refreshNameSuggestions(suggestList);
+
   for (const key of ["A", "B"]) {
     const inp = document.getElementById(`pool-name-${key.toLowerCase()}`);
     if (!inp) continue;
+    inp.setAttribute("list", suggestList.id);
     inp.value = state.poolName(key) || "";
+    inp.addEventListener("focus", () => refreshNameSuggestions(suggestList));
     inp.addEventListener("change", () => state.setPoolName(key, inp.value));
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Enter")  inp.blur();
@@ -61,6 +70,32 @@ export function initSourcePanel() {
   state.addEventListener("input:removed",     refresh);
   state.addEventListener("template:changed",  refresh);
   refresh();
+}
+
+// Shared <datalist> backing both pool-name inputs' autocomplete.
+function ensureNameSuggestList() {
+  let dl = document.getElementById("pool-name-suggestions");
+  if (!dl) {
+    dl = document.createElement("datalist");
+    dl.id = "pool-name-suggestions";
+    document.body.appendChild(dl);
+  }
+  return dl;
+}
+
+function refreshNameSuggestions(dl) {
+  if (!dl) return;
+  const names = new Set(collectPoolNames());
+  for (const key of ["A", "B"]) {
+    const v = (state.poolName(key) || "").trim();
+    if (v) names.add(v); // include the current (possibly unsaved) session names
+  }
+  // value set as a property (not innerHTML) → no escaping concerns.
+  dl.replaceChildren(...[...names].sort((a, b) => a.localeCompare(b)).map((n) => {
+    const opt = document.createElement("option");
+    opt.value = n;
+    return opt;
+  }));
 }
 
 function addSelectedToPool(key) {
