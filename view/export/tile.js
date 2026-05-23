@@ -1,0 +1,148 @@
+import { state } from "../../controller/state.js";
+import { applyRenderModeClass } from "../projectBar.js";
+import { VARIANT_PARAMS } from "../../core/variant_params.js";
+import { variantRng } from "../../core/random.js";
+import { LAYOUT_TILE_DISPLAY_PX } from "./_state.js";
+import { TEXTURE_OPS } from "../render2/textureOps/registry.js";
+import {
+  buildSlotGraph,
+  drawSlotComposite,
+  drawCutStroke,
+  drawOutline,
+} from "../render2/index.js";
+
+export function buildSlotBlock(slot, isVariant, variantIdx = 0) {
+  const nat = state.nativeSlotSize;
+  const ov = isVariant ? buildVariantOverride(slot.index, variantIdx) : null;
+  const noiseOverride = state.exportShowIslands
+    ? (ov?.noise || null)
+    : {
+        A: { ...(ov?.noise?.A || {}), enabled: false },
+        B: { ...(ov?.noise?.B || {}), enabled: false },
+      };
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "layout-tile" + (isVariant ? " is-variant" : "");
+  canvas.width  = nat;
+  canvas.height = nat;
+  canvas.style.width  = `${LAYOUT_TILE_DISPLAY_PX}px`;
+  canvas.style.height = `${LAYOUT_TILE_DISPLAY_PX}px`;
+  applyRenderModeClass(canvas);
+  canvas.dataset.slotIndex   = String(slot.index);
+  canvas.dataset.variantIdx  = String(isVariant ? variantIdx : 0);
+
+  const ctx = canvas.getContext("2d");
+  const origin = { x: 0, y: 0 };
+  const graph = buildSlotGraph(slot, {
+    curveOverride: ov?.curve || null,
+    noiseOverride,
+  });
+
+  if (state.exportLayoutView === "textures") {
+    const slotOv = state.getSlotPoolOverride(slot.index);
+    const pickSide = (key) => {
+      if (isVariant) return ov?.sources?.[key] ?? state.master(key);
+      if (slotOv[key] != null) return state.poolAt(key, slotOv[key]);
+      return state.master(key);
+    };
+    drawSlotComposite(ctx, slot, graph, origin, nat, {
+      mode:        state.renderMode,
+      sourceARef:  pickSide("A"),
+      sourceBRef:  pickSide("B"),
+    });
+    drawOutline(ctx, graph, origin, nat, { snap: state.renderMode === "pixel" });
+  } else {
+    drawCutStroke(ctx, graph, origin, nat, { snap: state.renderMode === "pixel" });
+  }
+  return canvas;
+}
+
+// Source tile rendered into a layout-tile canvas for the "Bundle source
+// tiles" rows. Goes through the active pool's texture-ops chain so the
+// bundled bitmap exactly matches what the export PNG (and the main
+// canvas) draw — autoTileable / boundarySnap / colorAdjust / etc.
+// applied to the pool that owns this entry.
+export function buildSourceBlock(entry) {
+  const nat = state.nativeSlotSize;
+  const canvas = document.createElement("canvas");
+  canvas.className = "layout-tile is-source";
+  canvas.width  = nat;
+  canvas.height = nat;
+  canvas.style.width  = `${LAYOUT_TILE_DISPLAY_PX}px`;
+  canvas.style.height = `${LAYOUT_TILE_DISPLAY_PX}px`;
+  applyRenderModeClass(canvas);
+  const ctx = canvas.getContext("2d");
+  if (entry?.tile?.canvas) {
+    const processed = applyPoolTextureOps(entry.tile.canvas, entry.key);
+    ctx.drawImage(processed, 0, 0, processed.width, processed.height,
+                  0, 0, nat, nat);
+  }
+  return canvas;
+}
+
+// Chain the registry's bitmap preprocessors for the given pool. Same
+// chain slotComposite#sourceBitmap walks; ops short-circuit on identity
+// params internally.
+export function applyPoolTextureOps(srcCanvas, poolKey) {
+  let bmp = srcCanvas;
+  for (const op of TEXTURE_OPS) {
+    const params = state.getGlobalTextureOp(poolKey, op.name);
+    if (params) bmp = op.apply(bmp, poolKey, params);
+  }
+  return bmp;
+}
+
+export function buildVariantOverride(slotIndex, variantIdx) {
+  const offset = state.getVariantSeedOffset(slotIndex, variantIdx);
+  const rng = variantRng(state.seed, slotIndex, variantIdx, offset);
+  const overrides = { curve: {}, noise: {}, sources: {} };
+  let hasAny = false;
+  for (const param of VARIANT_PARAMS) {
+    const range = state.getExportRange(slotIndex, param.key);
+    if (!range || range.dMin === range.dMax) continue;
+    const cur = currentGlobalValue(param);
+    const lo  = Math.max(param.min, cur + range.dMin);
+    const hi  = Math.min(param.max, cur + range.dMax);
+    if (lo === hi) continue;
+    const v = lo + rng() * (hi - lo);
+    if (param.source === "noise") {
+      const layer = param.layer;
+      if (!overrides.noise[layer]) overrides.noise[layer] = {};
+      overrides.noise[layer][param.subKey] = v;
+    } else {
+      overrides[param.source][param.key] = v;
+    }
+    hasAny = true;
+  }
+  const vpo = state.getVariantPoolOverride(slotIndex, variantIdx);
+  for (const key of ["A", "B"]) {
+    const pinned = vpo[key];
+    const ref = pinned != null
+      ? state.poolAt(key, pinned)
+      : weightedPickPoolRef(key, rng);
+    overrides.sources[key] = ref;
+    if (ref) hasAny = true;
+  }
+  return hasAny ? overrides : null;
+}
+
+export function weightedPickPoolRef(key, rng) {
+  const pool = state.pool(key);
+  if (pool.length === 0) return null;
+  if (pool.length === 1) return pool[0];
+  let total = 0;
+  for (let i = 0; i < pool.length; i++) total += Math.max(0, state.poolWeight(key, i));
+  if (total <= 0) return pool[0];
+  let r = rng() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= Math.max(0, state.poolWeight(key, i));
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+export function currentGlobalValue(param) {
+  if (param.source === "curve") return state.globalCurve[param.key] ?? 0;
+  if (param.source === "noise") return state.noiseParams[param.layer]?.[param.subKey] ?? 0;
+  return 0;
+}

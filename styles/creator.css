@@ -1,0 +1,482 @@
+/* Template creator — modal (initial creation), creator-toolbar, creator-editor grid + slot cells + add/remove buttons. */
+
+/* --- Modal (template creator) ------------------------------------------ */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+}
+
+.modal[aria-hidden="false"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal__dialog {
+  position: relative;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.modal__close {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-2);
+}
+
+.modal__close:hover { color: var(--color-text-strong); }
+
+.modal__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* --- Template creator content ----------------------------------------- */
+
+.tc-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tc-field__label {
+  flex: 0 0 100px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.tc-field__input {
+  flex: 1 1 auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  outline: none;
+}
+
+.tc-field__input:focus { border-color: var(--color-accent); }
+
+.tc-field__input--narrow { flex: 0 0 80px; }
+
+.tc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tc-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tc-section__title {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.tc-section__meta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.tc-resize {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.btn--sm {
+  padding: 2px var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.btn--primary {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+  border-color: var(--color-accent);
+}
+
+/* Generic modal — backdrop fills viewport, panel centred. Use `hidden`
+   attr to toggle; everything is `position: fixed` so it overlays the app. */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal[hidden] { display: none; }
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+.modal__panel {
+  position: relative;
+  min-width: 320px;
+  max-width: 90vw;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.modal__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-strong);
+}
+.modal__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.modal__warn {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-pool-b);
+}
+.modal__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.modal__input {
+  width: 80px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 4px var(--space-2);
+  font: inherit;
+}
+.modal__input:focus { border-color: var(--color-accent); outline: none; }
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Split-button: main action + chevron + dropdown menu. The two buttons sit
+   flush so they read as one control. The menu floats absolutely below the
+   chevron and is `[hidden]` until JS toggles it. */
+.split-button {
+  position: relative;
+  display: inline-flex;
+}
+.split-button__main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-button__toggle {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.25);
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
+}
+.split-button__menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 10;
+  min-width: 200px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.split-button__menu[hidden] { display: none; }
+.split-button__item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  padding: 4px var(--space-2);
+  font: inherit;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.split-button__item:hover:not([disabled]) {
+  background: var(--color-bg-hover);
+}
+.split-button__item[disabled] {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+.split-button__item.is-current {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Unsaved-template hints — template-select dropdown + creator Save button. */
+#template-select.is-dirty {
+  border-color: var(--color-accent);
+}
+#creator-save-library.is-dirty {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+  border-color: var(--color-accent);
+}
+
+.tc-hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+
+.creator-toolbar__name {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.creator-toolbar__meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.creator-toolbar__sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: 0 var(--space-1);
+}
+
+/* The grid-of-slots editor lives inside .creator-canvas. The outer
+   `.creator-editor` is a 2×2 layout: the slot grid itself, an "+ col"
+   button to its right, an "+ row" button below, and a corner cell
+   that adds both. Cells inside each slot block are clickable
+   (LMB = 1, RMB = 0). Cell size set by JS so the whole template fits. */
+.creator-editor {
+  display: inline-grid;
+  grid-template-columns: max-content 36px;
+  grid-template-rows:    max-content 36px;
+  gap: 6px;
+  user-select: none;
+}
+
+.creator-template-grid {
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-grid;
+  gap: 6px;
+}
+
+/* Use a brighter, contrasting tone for slot borders and cell gridlines
+   so they read clearly against both bg cells and accent-coloured cells.
+   var(--color-border) was too close to bg for small cell sizes. */
+.creator-slot-block {
+  display: inline-grid;
+  /* 2-px gap (was 1) so fractional dpr rasterization always renders
+     it — 1-px lines disappear at dpr=0.9 in places, alternately
+     hiding cell gridlines and producing a flickery look. */
+  gap: 2px;
+  background: var(--color-text-muted);
+  border: 2px solid var(--color-text-muted);
+  border-radius: 2px;
+  /* Anchor for the bridge-line SVG overlay (connectedSaddle hint). */
+  position: relative;
+}
+
+/* Saddle-bridge hint overlay drawn on top of the grid cells; pointer-events
+   off so painting still hits cells underneath. */
+.creator-slot-block__bridges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.creator-slot-block__bridges line {
+  stroke: var(--color-bridge-hint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.creator-grid__cell {
+  background: var(--color-bg);
+  cursor: pointer;
+  /* Anchor for the SVG divider overlay used by triangle cellShape. */
+  position: relative;
+  overflow: hidden;
+}
+
+/* SVG overlay drawn inside triangle-mode cells — shows the 5-region
+   structure (4 corner-to-centre diagonals + centre-square outline) so
+   the user can see where to click even when the cell is empty.
+   Pointer-events off so mouse interactions still hit the cell. */
+.creator-grid__cell-divider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+  fill: none;
+}
+
+.creator-grid__cell--on {
+  background: var(--color-accent);
+}
+
+.creator-grid__cell:hover {
+  outline: 2px solid var(--color-text-strong);
+  outline-offset: -3px;
+}
+
+/* Inline add/remove controls — wrap the slot grid in a 2×2 layout
+   with column controls on the right, row controls below, corner in
+   the bottom-right. */
+.creator-col-controls {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.creator-row-controls {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  min-width: 0;
+}
+
+.creator-add-col,
+.creator-add-row {
+  flex: 1 1 auto;
+  background: var(--color-bg-elevated);
+  border: 2px dashed var(--color-text-muted);
+  color: var(--color-text-muted);
+  border-radius: 4px;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.creator-add-col:hover,
+.creator-add-row:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.creator-add-corner {
+  grid-column: 2;
+  grid-row: 2;
+  background: transparent;
+  border: 2px dashed var(--color-border);
+  color: var(--color-text-faint);
+  border-radius: 4px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.creator-add-corner:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Square red remove buttons — same 36×36 footprint as the matching
+   + button so they line up cleanly. Confirm in JS before firing. */
+.creator-rm-col,
+.creator-rm-row {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 2px dashed #e74c3c;
+  color: #e74c3c;
+  border-radius: 4px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.creator-rm-col:hover,
+.creator-rm-row:hover {
+  background: #e74c3c;
+  color: #fff;

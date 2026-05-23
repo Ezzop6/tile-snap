@@ -1,0 +1,695 @@
+/* Workspace shell — topbar, 3-col split layout, panel skeleton, canvas area + toolbar, Split.js gutter overrides. */
+
+/* --- Top bar ------------------------------------------------------------ */
+
+.topbar {
+  flex: 0 0 var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* IO + mode groups get their own subtle background pill so the user
+   reads them as logical clusters rather than four loose buttons. */
+.topbar__io,
+.topbar__modes {
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* IO buttons: small, icon-prefixed text. */
+.btn--io {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+}
+.btn__icon  { font-size: var(--font-size-lg); line-height: 1; }
+.btn__label { font-size: var(--font-size-sm); }
+
+/* Stage mode tabs. The active one is filled with the accent colour to
+   make the user's current view obvious; inactive ones are flat. JS
+   sets `.is-active` on the right tab whenever body.{export,creator}-
+   active changes. */
+.mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 4px var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.mode-tab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+}
+.mode-tab.is-active {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+/* Inline name / dimension fields in the creator toolbar (replaces
+   the wizard modal). */
+.creator-toolbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.creator-toolbar__input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 2px var(--space-1);
+  font: inherit;
+}
+.creator-toolbar__input:focus { border-color: var(--color-accent); outline: none; }
+.creator-toolbar__input--num { width: 48px; }
+.creator-toolbar__input::-webkit-outer-spin-button,
+.creator-toolbar__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.creator-toolbar__input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.topbar__toggle {
+  height: 24px;
+  width: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar__toggle:hover {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.topbar__toggle[aria-pressed="true"] {
+  background: var(--color-bg-elevated);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.topbar__logo {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.topbar__separator {
+  color: var(--color-text-faint);
+}
+
+.topbar__project {
+  color: var(--color-text-muted);
+}
+
+.topbar__project-name {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  padding: 2px var(--space-2);
+  min-width: 8em;
+  max-width: 18em;
+  outline: none;
+  /* Now rendered as a <button> — keep it read-only and click-to-open. */
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__project-name:hover {
+  border-color: var(--color-border);
+}
+
+.topbar__project-name:focus {
+  border-color: var(--color-accent);
+  background: var(--color-bg-elevated);
+}
+
+/* Project identity combobox — name button + open-modal button. The full
+   project picker UI is now a separate modal (view/projectModal.js). */
+.project-combo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.project-combo__open {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  padding: 2px 6px;
+  line-height: 1;
+  user-select: none;
+}
+
+.project-combo__open:hover {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+/* Save button dirty state — accent fill when there are unsaved changes.
+   Bound by view/projectBar.js#syncSaveDirtyClass listening on
+   `project-dirty:changed`. */
+.btn--io.is-dirty {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.btn--io.is-dirty:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+/* Toast notifications — bottom-right stack, owned by view/toast.js. */
+.toast-stack {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: 8px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast--success {
+  border-left: 3px solid var(--color-accent);
+}
+
+.toast--error {
+  border-left: 3px solid #c44;
+  color: #f88;
+}
+
+/* Toasts with an action button get pointer events back — the action
+   button needs to be clickable. Plain toasts stay pointer-events:none
+   so they don't intercept clicks on what's behind them. */
+.toast:has(.toast__action) {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast__action {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.toast__action:hover {
+  filter: brightness(1.1);
+}
+
+/* Render-mode toggle in the top bar. Segmented two-position control;
+   the checked radio gets the accent treatment. Native radio inputs are
+   hidden — only the wrapping label is visible. */
+.render-mode {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+}
+
+.render-mode__option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.render-mode__option + .render-mode__option {
+  border-left: 1px solid var(--color-border);
+}
+
+.render-mode__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.render-mode__option:has(input:checked) {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+/* Topbar throttle toggle (aria-pressed=true = throttling ON). */
+#render-throttle-toggle {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+#render-throttle-toggle:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+#render-throttle-toggle[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+  border-color: var(--color-accent);
+}
+
+/* --- Workspace shell ---------------------------------------------------- */
+
+.workspace {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+}
+
+.main-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* min-width: 0 so Split.js can shrink the middle freely; the user can
+     drag the right gutter all the way left to give Texture · global the
+     full workspace width. */
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* --- Panels ------------------------------------------------------------- */
+
+.panel {
+  background: var(--color-bg-panel);
+  display: flex;
+  flex-direction: column;
+  /* min-width: 0 so Split.js fully controls minimum sizing per panel. */
+  min-width: 0;
+  /* Scroll the panel itself when section contents overflow — the
+     previous `overflow: hidden` hid the bottom of expanded Curve /
+     Noise / Inputs lists with no way to reach them. Horizontal stays
+     clipped (no h-scroll). */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.panel--left  { border-right: 1px solid var(--color-border); }
+.panel--right { border-left:  1px solid var(--color-border); }
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-border);
+  min-height: 0;
+  /* Default = content height. Sections stack from the top of the panel
+     and any leftover space lives at the bottom — collapsing one
+     section now pulls the rest up instead of leaving a void above. */
+  flex: 0 0 auto;
+}
+
+/* `display: flex` above ties with the UA's `[hidden] { display: none }`
+   on specificity and author wins → without this explicit override the
+   [hidden] attribute is a no-op on sections. Same trick as for
+   .curve-panel__field. */
+.panel-section[hidden] { display: none; }
+
+.panel-section:last-child {
+  border-bottom: none;
+}
+
+/* Explicit grow modifier — opt in if a section should fill the panel
+   instead of sitting at its content height. Currently unused: Selected
+   slot / Export preview are now pinned to a fixed 250 px (see below)
+   so the panel doesn't stretch them awkwardly. */
+.panel-section--grow {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Preview-style sections — the slot preview canvas and the export
+   preview tile both look best at a stable display size, capped at
+   250 px square (set by exportPanel.js / slotEditor.js). The section
+   itself grows to fit the canvas + header only (= no big void
+   underneath the canvas like the previous fixed height produced). */
+.panel-section--preview {
+  flex: 0 0 auto;
+}
+
+.panel-section__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panel-section__title {
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Collapsible header — click anywhere on the header bar (except the
+   action buttons in the actions cluster) toggles the body. The chevron
+   on the title rotates to show open/closed state. JS sets
+   `is-collapsed` on the section. */
+.panel-section__header--collapsible {
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-section__header--collapsible .panel-section__title::before {
+  content: "▾";
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 9px;
+  transition: transform 0.12s ease;
+  color: var(--color-text-muted);
+}
+
+.panel-section.is-collapsed .panel-section__title::before {
+  transform: rotate(-90deg);
+}
+
+.panel-section.is-collapsed .panel-section__header {
+  border-bottom: 0;
+}
+
+/* Hide every direct child of a collapsed section except its header. */
+.panel-section.is-collapsed > :not(.panel-section__header) {
+  display: none;
+}
+
+/* Inline numeric input that lives directly in the section header
+   (right of the title, left of the action buttons). Lets a tiny
+   single-field section skip its body entirely. */
+.panel-section__inline-input {
+  margin-left: var(--space-2);
+  margin-right: auto;
+  flex: 0 1 70px;
+  min-width: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 1px var(--space-1);
+  font: inherit;
+}
+.panel-section__inline-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.topbar__seed-input {
+  width: 60px;
+  height: 24px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 1px var(--space-1);
+  font: inherit;
+}
+.topbar__seed-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* Optional inline meta next to the title (e.g. "col 2 row 1 #9" on the
+   Selected slot header). Empty by default → hidden so the header falls
+   back to title ↔ actions. Pushes any subsequent flex children (= the
+   actions group) to the far right. */
+.panel-section__meta {
+  margin-left: var(--space-3);
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.panel-section__meta:empty { display: none; }
+
+.panel-section__meta-key {
+  color: var(--color-text-muted);
+  margin-right: 2px;
+}
+
+/* --- Canvas area -------------------------------------------------------- */
+
+.canvas-toolbar {
+  flex: 0 0 var(--canvas-toolbar-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.canvas-toolbar__spacer {
+  flex: 1 1 auto;
+}
+
+.canvas-toolbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.canvas-toolbar__select {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.canvas-toolbar__select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.canvas-toolbar__select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Main view (former preview) — fills the rest of the center area and
+   shows the final source-A-clipped composition. Background = shared
+   transparency checker (--checker-* tokens) so the same pattern
+   appears in preview / export / creator. */
+.main-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;       /* anchor for .map-overlay */
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  background: var(--checker-bg);
+}
+
+.main-template {
+  display: block;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+/* Map overlay — pinned to the top-right of the main stage. Height
+   fixed at 250 px, width auto-sizes to fit the canvas inside (= the
+   minimap can be wide for templates with many cols without being
+   cropped horizontally). No outer margin: the top and right edges sit
+   flush with the main area's edges. Shows the debug colouring
+   (cut/closure/dots) as a small reference. Click selects a slot, same
+   as clicking on the main view. */
+.map-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 250px;
+  max-width: 100%;
+  background: var(--color-bg-panel);
+  border-left:   2px solid var(--color-accent);
+  border-bottom: 2px solid var(--color-accent);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
+  z-index: 10;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* `Map` toggle in the canvas toolbar — works in both preview and
+   export modes so the user can hide the overlay any time. */
+body.map-hidden .map-overlay { display: none !important; }
+
+/* Pipeline trace overlay — fixed position, centred over the viewport so
+   the user can see timings on any mode (preview / debug / export / etc.)
+   without it being clipped to a specific stage. Top-level child of body
+   in the DOM, high z-index so it floats above modal/menu chrome too. */
+.trace-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  max-height: 70vh;
+  background: var(--color-bg-panel);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: var(--font-size-xs, 10px);
+  padding: var(--space-2);
+  z-index: 1000;
+  overflow: auto;
+  pointer-events: none;
+}
+.trace-overlay[hidden] { display: none; }
+.trace-overlay__title {
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: var(--space-1);
+}
+.trace-overlay__group {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 2px;
+}
+.trace-overlay__row,
+.trace-overlay__total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.trace-overlay__total {
+  font-weight: 700;
+  border-top: 1px solid var(--color-border);
+  margin-top: 2px;
+  padding-top: 2px;
+}
+.trace-overlay__empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.map-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-template {
+  display: block;
+  cursor: pointer;
+}
+
+/* Render-mode classes — applied to every preview canvas. Pixel mode
+   forces nearest-neighbor CSS scaling so slot bounds stay pixel-aligned
+   when the canvas gets enlarged via `transform: scale()`. Smooth mode
+   lets the browser bilinear-interpolate; mainView re-renders at the
+   target resolution there, so there's no scaling artifact to worry
+   about. */
+.render-pixel  { image-rendering: pixelated; }
+.render-smooth { image-rendering: auto; }
+
+
+/* --- Split.js gutters --------------------------------------------------- */
+
+.gutter {
+  background-color: var(--color-gutter);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transition: background-color 80ms ease-in-out;
+}
+
+.gutter:hover {
+  background-color: var(--color-gutter-hover);
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='16'><rect width='1' height='16' x='1' fill='%23555'/><rect width='1' height='16' x='3' fill='%23555'/></svg>");
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='4'><rect width='16' height='1' y='1' fill='%23555'/><rect width='16' height='1' y='3' fill='%23555'/></svg>");
+}
+

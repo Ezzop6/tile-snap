@@ -1,0 +1,111 @@
+/* Mode switching — body.X-active rules, shared stage box (creator/export/debug/bundle), debug-canvas, mode toolbar visibility. */
+
+/* --- Creator mode (lives inside #main-stage, swapped in by JS) -------- */
+/* Two view modes share the main area: preview (mainView canvas + map
+   overlay) and creator (grid-of-slots editor). The wizard "Create"
+   button hides preview and shows creator; the Exit button reverses it.
+   .creator-canvas is absolute-positioned so it stacks on top of the
+   main-template canvas; toggling [hidden] swaps which is visible. */
+
+.creator-canvas,
+.export-stage,
+.debug-stage,
+.bundle-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  overflow: auto;
+  background: var(--checker-bg);
+}
+
+
+/* Debug mode canvas — abstract PointGraph render, no source textures.
+   Sized in JS to match the template's layout (cols × rows × slotSize).
+   Smooth interpolation on zoom: the canvas renders an abstract curve
+   definition (no pixel-art textures), so the native bilinear filter
+   keeps strokes crisp at any scale instead of showing chunky pixel steps. */
+.debug-canvas {
+  display: block;
+  image-rendering: auto;
+  background: var(--color-bg);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+/* Mode-specific toolbar groups. Hidden until their mode activates. */
+.canvas-toolbar__creator,
+.canvas-toolbar__export,
+.canvas-toolbar__import {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Creator group fills the available width so its inner __spacer can push the
+   action buttons to the right edge of the toolbar. Without flex-grow the
+   group collapses to content size and the inner spacer has no room. */
+.canvas-toolbar__creator {
+  flex: 1 1 auto;
+}
+
+/* In creator mode, suppress the OUTER toolbar spacer (direct child of
+   .canvas-toolbar) so it doesn't compete with the creator group for flex
+   space. Inner spacer (descendant of .canvas-toolbar__creator) keeps its
+   1fr share. Direct-child selector `>` so we only hit the outer one. */
+body.creator-active .canvas-toolbar > .canvas-toolbar__spacer {
+  display: none;
+}
+/* Preview-only: hide the import-from-project selects when the user is
+   in any other mode. The params they replace (curve / noise / texture
+   ops) are surfaced in the right panel during preview mode. */
+body.creator-active  .canvas-toolbar__import,
+body.export-active   .canvas-toolbar__import,
+body.debug-active    .canvas-toolbar__import,
+body.bundle-active   .canvas-toolbar__import,
+body.texture-active  .canvas-toolbar__import { display: none !important; }
+
+/* Body class toggles which view mode is visible. Single source of
+   truth — JS just adds/removes `creator-active` / `export-active` on
+   <body> and these rules drive everything. `!important` to win over
+   per-element class `display` values without specificity gymnastics. */
+body:not(.creator-active) .canvas-toolbar__creator { display: none !important; }
+body:not(.creator-active) .creator-canvas          { display: none !important; }
+body:not(.export-active)  .canvas-toolbar__export  { display: none !important; }
+body:not(.export-active)  .export-stage            { display: none !important; }
+body:not(.debug-active)   .debug-stage             { display: none !important; }
+body:not(.bundle-active)  .bundle-stage            { display: none !important; }
+
+/* Floating top-right minimap (`#map-toggle` / `.map-overlay`) is a
+   preview-mode feature; hide it in creator + debug + bundle modes. */
+body.creator-active #map-toggle,
+body.debug-active   #map-toggle,
+body.bundle-active  #map-toggle            { display: none !important; }
+body.creator-active .map-overlay,
+body.debug-active   .map-overlay,
+body.bundle-active  .map-overlay           { display: none !important; }
+body.creator-active .main-template,
+body.export-active  .main-template,
+body.debug-active   .main-template,
+body.bundle-active  .main-template         { display: none !important; }
+
+/* Right-panel sections swap by mode. `data-mode` is a SPACE-SEPARATED
+   list of modes in which the element should be visible — e.g.
+   `data-mode="preview debug"` shows in both preview and debug. Implicit
+   preview mode = no body.*-active class. */
+body:not(.export-active):not(.creator-active):not(.debug-active):not(.bundle-active)
+  [data-mode]:not([data-mode~="preview"]) { display: none !important; }
+body.export-active  [data-mode]:not([data-mode~="export"])   { display: none !important; }
+body.creator-active [data-mode]:not([data-mode~="template"]) { display: none !important; }
+body.debug-active   [data-mode]:not([data-mode~="debug"])    { display: none !important; }
+body.bundle-active  [data-mode]:not([data-mode~="bundle"])   { display: none !important; }
+
+/* Texture mode keeps the preview-mode rail (Curve / Noise / Texture ·
+   global), but force-hides the Selected slot panel — it's the only
+   section that depends on a slot click and we don't want it competing
+   with the full-screen Texture · global takeover. */
+body.texture-active #slot-editor-section { display: none !important; }
+

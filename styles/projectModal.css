@@ -1,0 +1,357 @@
+/* Projects modal — replaces the old topbar dropdown picker.
+   Built directly into <body> by view/projectModal.js. */
+
+.project-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-modal.is-open {
+  display: flex;
+}
+
+.project-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.project-modal__box {
+  position: relative;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.project-modal__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.project-modal__close:hover { color: var(--color-text-strong); }
+
+.project-modal__title {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.project-modal__rename-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.project-modal__rename-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+
+.project-modal__rename-input {
+  flex: 1 1 auto;
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-md);
+}
+
+.project-modal__rename-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.project-modal__rename-input:disabled {
+  opacity: 0.5;
+}
+
+.project-modal__list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Row = horizontal grid: identity | pools | actions. Compact, info-dense,
+   mirrors bundle card structure. */
+.project-modal__row {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.project-modal__row:hover:not(.is-active) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.project-modal__row.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+  cursor: default;
+}
+
+.project-modal__row-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-modal__row-name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-modal__row-name--dirty {
+  color: var(--color-accent);
+}
+
+.project-modal__row-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.project-modal__row-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+
+.project-modal__row-pools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.project-modal__row-arrow {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-md);
+}
+
+/* Pool block = vertical: thumb (with corner A/B badge) on top, name below.
+   Fixed width so different-length names don't desync the two columns. */
+.project-modal__pool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 56px;
+  font-size: var(--font-size-xs);
+}
+
+.project-modal__pool-thumb-wrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.project-modal__pool-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--checker-bg);
+  border: 1px solid var(--color-border);
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.project-modal__pool-thumb--empty {
+  background: var(--color-bg);
+}
+
+.project-modal__pool-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--color-text-strong);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  z-index: 1;
+  box-shadow: 0 0 0 1px var(--color-bg-panel);
+}
+
+.project-modal__pool--a .project-modal__pool-badge { background: var(--color-pool-a); }
+.project-modal__pool--b .project-modal__pool-badge { background: var(--color-pool-b); }
+
+.project-modal__pool-name {
+  color: var(--color-text);
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-modal__pool-name--fallback {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.project-modal__row-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.project-modal__icon-btn {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.project-modal__icon-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.project-modal__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.project-modal__icon-btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.project-modal__icon-btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.project-modal__icon-btn--danger:hover:not(:disabled) {
+  border-color: #b04040;
+  color: #ff8888;
+  background: rgba(176, 64, 64, 0.15);
+}
+
+.project-modal__btn {
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.project-modal__btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.project-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.project-modal__btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.project-modal__btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.project-modal__btn--danger {
+  background: transparent;
+  border-color: #b04040;
+  color: #ff8888;
+}
+
+.project-modal__btn--danger:hover:not(:disabled) {
+  background: rgba(176, 64, 64, 0.15);
+  color: #ffaaaa;
+}
+
+.project-modal__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.project-modal__footer-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.project-modal__usage {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.project-modal__empty {
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.project-modal__empty-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-top: var(--space-3);
+}

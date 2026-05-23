@@ -1,0 +1,99 @@
+/*
+ * Design tokens
+ *
+ * Single source of truth for visual values across the whole tool.
+ * Components must reference these vars; no hard-coded hex/px in feature CSS.
+ */
+
+:root {
+  /* Surface colors (dark theme) */
+  --color-bg:           #1e1e1e;
+  --color-bg-panel:     #252526;
+  --color-bg-elevated:  #2d2d30;
+  --color-bg-hover:     #2a2d2e;
+  --color-bg-active:    #094771;
+
+  /* Borders */
+  --color-border:       #3e3e42;
+  --color-border-strong:#555558;
+
+  /* Text */
+  --color-text:         #d4d4d4;
+  --color-text-strong:  #ffffff;
+  --color-text-muted:   #858585;
+  --color-text-faint:   #6a6a6a;
+
+  /* Accent */
+  --color-accent:       #0e7ec4;
+  --color-accent-hover: #1190d6;
+
+  /* Source pool sides — every A / B indicator (label chip, "+" button,
+   * thumb master border, inputs canvas corner triangle, slot-override
+   * label) reads from these so a single edit re-skins the whole flow. */
+  --color-pool-a:       #3b9eff;
+  --color-pool-b:       #ff5050;
+
+  /* Abstract / structural hint overlay (= saddle-bridge indicator in the
+   * template editor). Distinct from --color-accent so it doesn't blend
+   * with the "cell on" tint. */
+  --color-bridge-hint:  #ff66cc;
+
+  /* Gutters (Split.js separators) */
+  --color-gutter:       #2d2d30;
+  --color-gutter-hover: #094771;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radii */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:   "SF Mono", "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-lg: 14px;
+
+  /* Fixed sizes (layout chrome) */
+  --topbar-height:           40px;
+  --canvas-toolbar-height:   36px;
+  --panel-min-width:         180px;
+  --canvas-min-width:        240px;
+
+  /* Preview tile size — meant to be overridden at runtime by the preview zoom buttons */
+  --preview-tile-size: 48px;
+
+  /* Split.js gutter thickness */
+  --gutter-size: 4px;
+
+  /* Transparency checker — shared across preview / export / creator
+   * stages. Classic Photoshop-style checkerboard built with a single
+   * conic-gradient: each repeating cell has 4 quadrants alternating
+   * light/dark, which tiles into perfect squares (not diamonds).
+   * Contrast is intentionally well above the dark UI background so
+   * the pattern reads at a glance.
+   *
+   * `--checker-cell` is the square edge length (the conic pattern is
+   * `2× --checker-cell` wide because it covers two adjacent squares
+   * before repeating). */
+  --checker-cell:        10px;
+  --checker-bg-dark:     #1e1e1e;          /* darker square (matches app bg) */
+  --checker-bg-light:    #353535;          /* lighter square */
+  --checker-bg:
+    conic-gradient(
+      var(--checker-bg-light) 0   25%,
+      var(--checker-bg-dark)  0   50%,
+      var(--checker-bg-light) 0   75%,
+      var(--checker-bg-dark)  0 100%
+    )
+    0 0 / calc(var(--checker-cell) * 2) calc(var(--checker-cell) * 2),
+    var(--checker-bg-dark);
+}

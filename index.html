@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1024">
+  <title>Tileset Generator</title>
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <header class="topbar">
+    <!-- Left: project identity + IO group. -->
+    <div class="topbar__group">
+      <button class="topbar__toggle" id="toggle-left-panel" type="button" aria-pressed="false" title="Hide / show left panel"><span aria-hidden="true">☰</span></button>
+      <span class="topbar__logo">Tileset Generator</span>
+      <span class="topbar__separator">·</span>
+      <div class="project-combo">
+        <button class="topbar__project-name" id="project-name-display" type="button" title="Open projects (Ctrl+O)">untitled</button>
+        <button class="project-combo__open" id="project-modal-toggle" type="button" title="Open projects (Ctrl+O)">📂</button>
+      </div>
+    </div>
+    <div class="topbar__group topbar__io">
+      <button class="btn btn--io" id="btn-save"   title="Save active project (Ctrl+S)"><span class="btn__icon">💾</span><span class="btn__label">Save</span></button>
+    </div>
+
+    <!-- Centre: stage mode tabs. Active tab gets the accent fill;
+         clicking another tab swaps modes (no per-stage Exit needed). -->
+    <div class="topbar__group topbar__modes" role="tablist" aria-label="Stage">
+      <button class="mode-tab" id="mode-preview"  type="button" role="tab">Preview</button>
+      <button class="mode-tab" id="mode-export"   type="button" role="tab">Export</button>
+      <button class="mode-tab" id="mode-template" type="button" role="tab">+ Template</button>
+      <button class="mode-tab" id="mode-texture"  type="button" role="tab" title="Hide left panel + middle workspace; the right Texture · global panel fills the screen.">Texture</button>
+      <button class="mode-tab" id="mode-bundle"   type="button" role="tab" title="Combine multiple projects into a single Godot TileSet with shared terrain_set.">Bundle</button>
+      <button class="mode-tab" id="mode-debug"    type="button" role="tab" title="PointGraph abstraction debug view (new pipeline, no textures).">Debug</button>
+    </div>
+
+    <!-- Right: render mode + noise throttle toggle + project seed shortcut. -->
+    <div class="topbar__group">
+      <div class="render-mode" role="radiogroup" aria-label="Render mode">
+        <label class="render-mode__option">
+          <input type="radio" name="render-mode" value="pixel" checked>
+          <span>Pixel</span>
+        </label>
+        <label class="render-mode__option">
+          <input type="radio" name="render-mode" value="smooth">
+          <span>Smooth</span>
+        </label>
+      </div>
+      <input class="topbar__seed-input" id="project-seed" type="number" min="0" max="99999" step="1" value="42" title="Project seed (drives noise + variants)">
+      <button class="topbar__toggle" id="project-seed-random" type="button" title="Randomize project seed">🎲</button>
+      <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Cap the heavy ops (noise + wave) at ~5x/sec during slider drag (default). Toggle off for live updates — smoother visual at the cost of drag responsiveness.">Throttle rendering</button>
+      <button class="topbar__toggle" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (centred on screen).">⏱</button>
+      <button class="topbar__toggle" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="panel panel--left" id="panel-left">
+      <section class="panel-section panel-section--fixed">
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Sources</h2>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" type="button" id="pool-swap" title="Swap pools A ↔ B (entries, weights, overrides)">⇄</button>
+          </div>
+        </header>
+        <div class="pool-rows">
+          <div class="pool-row pool-row--card" data-pool="A">
+            <header class="pool-row__header">
+              <span class="pool-row__label">A</span>
+              <input class="pool-row__name" id="pool-name-a" type="text" spellcheck="false"
+                     placeholder="terrain name"
+                     title="Terrain name used when this project is bundled with others into a single Godot TileSet. Empty = falls back to the master tile's filename.">
+              <button class="pool-row__clear" data-pool-clear="A" type="button" title="Remove every entry from pool A" aria-label="Clear pool A">🗑</button>
+            </header>
+            <div class="pool-row__body">
+              <div class="pool-row__items" id="pool-items-a"></div>
+              <div class="pool-row__add-group">
+                <button class="pool-row__add" id="pool-add-a" type="button" title="Add selected input tile to pool A">+</button>
+                <button class="pool-row__add-rest" id="pool-add-rest-a" type="button" title="Add the rest of master's input as variants">⊞ all</button>
+                <button class="pool-row__add-rest" id="pool-randomize-a" type="button" title="Assign a random pool A entry to every slot">🎲</button>
+              </div>
+            </div>
+          </div>
+          <div class="pool-row pool-row--card" data-pool="B">
+            <header class="pool-row__header">
+              <span class="pool-row__label">B</span>
+              <input class="pool-row__name" id="pool-name-b" type="text" spellcheck="false"
+                     placeholder="terrain name"
+                     title="Terrain name used when this project is bundled with others into a single Godot TileSet. Empty = falls back to the master tile's filename.">
+              <button class="pool-row__clear" data-pool-clear="B" type="button" title="Remove every entry from pool B" aria-label="Clear pool B">🗑</button>
+            </header>
+            <div class="pool-row__body">
+              <div class="pool-row__items" id="pool-items-b"></div>
+              <div class="pool-row__add-group">
+                <button class="pool-row__add" id="pool-add-b" type="button" title="Add selected input tile to pool B">+</button>
+                <button class="pool-row__add-rest" id="pool-add-rest-b" type="button" title="Add the rest of master's input as variants">⊞ all</button>
+                <button class="pool-row__add-rest" id="pool-randomize-b" type="button" title="Assign a random pool B entry to every slot">🎲</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel-section">
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Inputs</h2>
+        </header>
+        <div class="inputs-toolbar">
+          <label class="inputs-toolbar__search">
+            <span class="inputs-toolbar__icon" aria-hidden="true">🔍</span>
+            <input class="inputs-toolbar__search-input" id="inputs-search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="inputs-toolbar__cols" title="How many columns of input cards to show">
+            <span class="inputs-toolbar__cols-label">Cols</span>
+            <input class="inputs-toolbar__cols-input" id="inputs-cols" type="number" min="1" max="6" step="1" value="1">
+          </label>
+        </div>
+        <ul class="list inputs-list" id="inputs-list" data-empty="Drop an image anywhere to import."></ul>
+      </section>
+    </aside>
+
+    <main class="main-area" id="main-area">
+      <div class="canvas-toolbar" id="canvas-toolbar">
+        <!-- Mode-specific groups come first (left side). Hidden by
+             body.*-active CSS rules — only the matching one is visible
+             at any moment. Reset view + Map sit to the right of them
+             so the same two utility buttons are always at the same
+             horizontal slot regardless of mode. -->
+        <label class="canvas-toolbar__field" id="canvas-toolbar-preview">
+          Template
+          <select class="canvas-toolbar__select" id="template-select" title="Switch template">
+            <!-- options populated by canvasToolbar.js -->
+          </select>
+        </label>
+        <!-- Creator mode controls. Visibility driven by body.creator-active
+             (see styles/main.css). -->
+        <!-- Creator-mode inline controls. The template-select dropdown above
+             is the single source of truth for which template is active across
+             every mode (preview / map / export / creator). Builtin edits are
+             intercepted in templateCreator.js (confirm → in-memory copy).
+             Save persists state.template to user storage.
+             Add/remove layout buttons sit inline with the canvas grid. -->
+        <div class="canvas-toolbar__creator" id="canvas-toolbar-creator">
+          <!-- Left group: identity + layout meta. -->
+          <label class="creator-toolbar__field">
+            <span>Name</span>
+            <input class="creator-toolbar__input" id="creator-name-input" type="text" value="my-template" autocomplete="off" spellcheck="false">
+          </label>
+          <span class="creator-toolbar__meta" id="creator-meta" title="Number of tiles in this template (layout grid). Add/remove with the + / × buttons next to the editor.">Layout: 1 × 1</span>
+          <!-- Spacer pushes the action buttons (incl. Pack) to the right.
+               Left = identity (name + layout meta); right = actions. -->
+          <span class="canvas-toolbar__spacer"></span>
+          <!-- Right group: I/O actions + Pack (layout transform). -->
+          <button class="btn btn--sm" type="button" id="creator-pack" title="Reorganise slot grid to a more square layout (e.g. 5×15 → 9×9). Slot data is preserved; new blank cells may be added.">🧩 Pack</button>
+          <button class="btn btn--sm" type="button" id="creator-save-library" title="Save to template library">💾 Save</button>
+          <button class="btn btn--sm" type="button" id="creator-duplicate" title="Duplicate the current template (saves a copy with an incremented name)">⎘ Duplicate</button>
+          <button class="btn btn--sm" type="button" id="creator-delete-template" title="Delete the currently-loaded user template" disabled>🗑 Delete</button>
+          <button class="btn btn--sm" type="button" id="creator-import" title="Import a template JSON file">⬆ Import</button>
+          <button class="btn btn--sm btn--primary" type="button" id="creator-export">Export JSON</button>
+        </div>
+        <!-- Export-mode toolbar — split-button. Main button runs the
+             currently-selected export type (label reflects last choice,
+             persisted in settings). Chevron opens dropdown to switch type. -->
+        <div class="canvas-toolbar__export" id="canvas-toolbar-export">
+          <div class="split-button" id="export-action">
+            <button class="btn btn--sm btn--primary split-button__main" type="button" id="export-do">Export PNG</button>
+            <button class="btn btn--sm btn--primary split-button__toggle" type="button" id="export-mode-toggle" aria-haspopup="menu" aria-expanded="false" aria-label="Change export type">▾</button>
+            <div class="split-button__menu" id="export-mode-menu" role="menu" hidden>
+              <button class="split-button__item" type="button" role="menuitem" data-export-mode="png">PNG</button>
+              <button class="split-button__item" type="button" role="menuitem" data-export-mode="godot">Godot 4 (PNG + .tres)</button>
+              <button class="split-button__item" type="button" role="menuitem" data-export-mode="json">JSON (self-contained project)</button>
+              <button class="split-button__item" type="button" role="menuitem" data-export-mode="zip">ZIP (PNG + .tres + JSON)</button>
+            </div>
+          </div>
+        </div>
+        <!-- Spacer pushes the utility buttons (⊕ + Map) to the right edge in
+             modes that don't have their own internal spacer. Hidden in
+             creator mode (see modes.css) so the creator group's INNER spacer
+             can do the work instead. -->
+        <span class="canvas-toolbar__spacer"></span>
+        <!-- Import params from another project — preview-mode only.
+             Picking a project copies its curve + noise (or texture ops)
+             over the current project's. No per-slot data, replace semantics. -->
+        <div class="canvas-toolbar__import" id="canvas-toolbar-import">
+          <select class="canvas-toolbar__select" id="import-curve-noise"
+                  title="Replace this project's Curve params + Noise A/B with another project's. Per-slot deformations unaffected.">
+            <option value="" disabled selected>Import curve + noise ▾</option>
+          </select>
+          <select class="canvas-toolbar__select" id="import-texture-ops"
+                  title="Replace this project's pool A + B texture op chains with another project's. Pool refs unaffected.">
+            <option value="" disabled selected>Import texture ops ▾</option>
+          </select>
+        </div>
+        <!-- Utility buttons — always in the same horizontal slot
+             regardless of which mode-group is currently visible. -->
+        <button class="btn btn--sm btn--icon" id="view-reset" type="button" title="Reset pan + zoom in the active stage" aria-label="Reset view">⊕</button>
+        <button class="btn btn--sm" id="map-toggle" type="button" title="Show/hide map overlay">Map</button>
+      </div>
+      <div class="main-stage" id="main-stage">
+        <!-- Map overlay: small debug minimap floating in top-right. Fixed
+             300×300; click on it selects a slot just like clicking on
+             the main view. Hidden in creator mode. -->
+        <div class="map-overlay" id="map-overlay">
+          <div class="map-stage" id="map-stage"></div>
+        </div>
+        <!-- Creator editor — sibling of mainView's canvas. Visibility
+             driven by body.creator-active. When creator mode is off
+             the CSS rule hides this; when on, .main-template hides
+             and this fills the stage. -->
+        <div class="creator-canvas" id="creator-canvas"></div>
+        <!-- Export stage. Visibility driven by body.export-active.
+             The floating .map-overlay (top-right) stays in its normal
+             position — we don't relocate it. This stage just shows the
+             layout grid below it. Template slots stay at their exact
+             (col, row) positions; configured variants are appended in a
+             separate region (direction = down | right; see state). -->
+        <div class="export-stage" id="export-stage">
+          <div class="layout-grid" id="export-layout-grid"></div>
+        </div>
+        <!-- Debug mode: PointGraph abstraction canvas (cuts / closures /
+             points), no source textures. Hidden unless body.debug-active. -->
+        <div class="debug-stage" id="debug-stage">
+          <canvas class="debug-canvas" id="debug-canvas"></canvas>
+        </div>
+        <!-- Bundle mode: matrix view of multiple projects → combined Godot
+             TileSet export. No canvas — just the matrix table. Hidden
+             unless body.bundle-active. -->
+        <div class="bundle-stage" id="bundle-stage">
+          <div class="bundle-matrix" id="bundle-matrix"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel panel--right" id="panel-right">
+      <section class="panel-section panel-section--preview" id="slot-editor-section" data-mode="preview" hidden>
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Selected</h2>
+          <span class="panel-section__meta" id="slot-meta"></span>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" id="slot-reset" type="button" title="Reset deformations on this slot">↺</button>
+          </div>
+        </header>
+        <div class="parameters" id="parameters"></div>
+      </section>
+
+      <section class="panel-section" data-mode="preview">
+        <header class="panel-section__header panel-section__header--collapsible">
+          <h2 class="panel-section__title">Texture · global</h2>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" id="tex-ops-expand" type="button" aria-pressed="false" title="Collapse the middle workspace so the right panel takes the remaining width">⛶</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="tex-ops-reset" type="button" title="Reset all global texture ops">↺</button>
+          </div>
+        </header>
+        <div class="tex-ops" id="tex-ops-body">
+          <div class="tex-ops__toolbar">
+            <div class="tex-ops__pool-switch" id="tex-ops-pool-switch" role="group" aria-label="Active pool (edited)">
+              <button class="tex-ops__pool-btn is-active" type="button" data-pool="A">A</button>
+              <button class="tex-ops__pool-btn" type="button" data-pool="B">B</button>
+            </div>
+            <div class="tex-ops__pool-switch" id="tex-ops-view-switch" role="group" aria-label="Preview view mode">
+              <button class="tex-ops__pool-btn is-active" type="button" data-view="tiles" title="3×3 raw bitmaps from the active pool">Tiles</button>
+              <button class="tex-ops__pool-btn" type="button" data-view="composite" title="Live snapshot of the main preview canvas (cut + texture + all ops)">Preview</button>
+            </div>
+            <button class="curve-panel__btn" id="tex-ops-shuffle" type="button" title="Shuffle tile preview">🎲</button>
+          </div>
+          <div class="tex-ops__stage" id="tex-ops-stage">
+            <canvas class="tex-ops__canvas" id="tex-ops-canvas"></canvas>
+          </div>
+          <div class="tex-ops__ops" id="tex-ops-ops"></div>
+        </div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="preview debug">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="curve-body">
+          <h2 class="panel-section__title">Curve · global</h2>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" id="curve-reset-all" type="button" title="Reset all curve params to defaults">↺</button>
+            <button class="curve-panel__btn curve-panel__btn--header curve-panel__btn--danger" id="curve-reset-paths" type="button" title="Reset all path deformations (drag offsets) across every tile">∿</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="curve-random-all" type="button" title="Randomize all">🎲</button>
+          </div>
+        </header>
+        <div class="curve-panel" id="curve-body">
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Pre-pipeline 2D random shift of non-boundary points. Runs FIRST so inflate / cornerSoften / wave cascade onto a perturbed graph — every tile gets a different chain shape. Seeded from the project seed.">Organic</span>
+            <input class="curve-panel__slider" id="curve-organic" type="range" min="0" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-organic-value" type="number" min="0" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="organic" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="organic" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Inflate</span>
+            <input class="curve-panel__slider" id="curve-inflate" type="range" min="-100" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-inflate-value" type="number" min="-100" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="inflate" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="inflate" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="How much of each leg to consume at every eligible corner (0..1 fraction). 0 = corner untouched, 1 = meets neighbour at midpoint.">Corner softness</span>
+            <input class="curve-panel__slider" id="curve-cornerSoftness" type="range" min="0" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-cornerSoftness-value" type="number" min="0" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="cornerSoftness" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="cornerSoftness" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Shape of the corner cut: 0 = flat chamfer, 1 = full arc round, anything between = partial arc. No effect when softness = 0.">Corner arcness</span>
+            <input class="curve-panel__slider" id="curve-cornerArcness" type="range" min="0" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-cornerArcness-value" type="number" min="0" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="cornerArcness" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="cornerArcness" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Wave amplitude</span>
+            <input class="curve-panel__slider" id="curve-waveAmplitude" type="range" min="-100" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-waveAmplitude-value" type="number" min="-100" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="waveAmplitude" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="waveAmplitude" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Wave frequency</span>
+            <input class="curve-panel__slider" id="curve-waveFrequency" type="range" min="0" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-waveFrequency-value" type="number" min="0" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="waveFrequency" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="waveFrequency" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Phase noise along the chain — breaks the perfectly periodic sin so waves don't all line up identically.">Wave jitter</span>
+            <input class="curve-panel__slider" id="curve-waveJitter" type="range" min="0" max="100" step="1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-waveJitter-value" type="number" min="0" max="100" step="1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="waveJitter" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="waveJitter" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="0 = bumps only on one side (sign follows wave amplitude). 100 = oscillates both inward and outward equally.">Wave symmetric</span>
+            <input class="curve-panel__slider" id="curve-waveSymmetric" type="range" min="0" max="100" step="1" value="100">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-waveSymmetric-value" type="number" min="0" max="100" step="1" value="100">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="waveSymmetric" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="waveSymmetric" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Outline width</span>
+            <input class="curve-panel__slider" id="curve-outlineWidth" type="range" min="0" max="4" step="0.1" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" id="curve-outlineWidth-value" type="number" min="0" max="4" step="0.1" value="0">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="outlineWidth" title="Reset">↺</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Outline color</span>
+            <input class="curve-panel__color" id="curve-outlineColor" type="color" value="#000000">
+            <button class="curve-panel__btn" type="button" data-curve-action="reset" data-curve-key="outlineColor" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-curve-action="random" data-curve-key="outlineColor" title="Randomize">🎲</button>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="preview debug">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="noise-A-body">
+          <h2 class="panel-section__title">Noise A · holes</h2>
+          <div class="panel-section__actions">
+            <label class="curve-panel__toggle" title="Enable layer A">
+              <input type="checkbox" data-noise-layer="A" data-noise-action="enable">
+              <span>on</span>
+            </label>
+            <button class="curve-panel__btn curve-panel__btn--header" type="button" data-noise-layer="A" data-noise-action="reset-layer" title="Reset layer A to defaults">↺</button>
+          </div>
+        </header>
+        <div class="curve-panel" id="noise-A-body">
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Underlying scalar field — drives the visual character of the islands.">Type</span>
+            <select class="curve-panel__input curve-panel__input--narrow" data-noise-layer="A" data-noise-key="type">
+              <option value="simplex">Simplex (blobs)</option>
+              <option value="ridged">Ridged (cracks)</option>
+              <option value="billowy">Billowy (clouds)</option>
+              <option value="fbm">fBm (multi-scale)</option>
+              <option value="worley">Worley (cells)</option>
+            </select>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Density</span>
+            <input class="curve-panel__slider" data-noise-layer="A" data-noise-key="density" data-role="slider" type="range" min="0" max="100" step="0.001" value="50">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="A" data-noise-key="density" data-role="value" type="number" min="0" max="100" step="0.001" value="50">
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="reset" data-noise-key="density" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="random" data-noise-key="density" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Scale</span>
+            <input class="curve-panel__slider" data-noise-layer="A" data-noise-key="scale" data-role="slider" type="range" min="0" max="100" step="0.001" value="50">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="A" data-noise-key="scale" data-role="value" type="number" min="0" max="100" step="0.001" value="50">
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="reset" data-noise-key="scale" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="random" data-noise-key="scale" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Fade noise near the cut edge — fraction of one cell width. 0 = no fade.">Edge fade</span>
+            <input class="curve-panel__slider" data-noise-layer="A" data-noise-key="edgeFade" data-role="slider" type="range" min="0" max="100" step="0.001" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="A" data-noise-key="edgeFade" data-role="value" type="number" min="0" max="100" step="0.001" value="0">
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="reset" data-noise-key="edgeFade" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="A" data-noise-action="random" data-noise-key="edgeFade" title="Randomize">🎲</button>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="preview debug">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="noise-B-body">
+          <h2 class="panel-section__title">Noise B · patches</h2>
+          <div class="panel-section__actions">
+            <label class="curve-panel__toggle" title="Enable layer B">
+              <input type="checkbox" data-noise-layer="B" data-noise-action="enable">
+              <span>on</span>
+            </label>
+            <button class="curve-panel__btn curve-panel__btn--header" type="button" data-noise-layer="B" data-noise-action="reset-layer" title="Reset layer B to defaults">↺</button>
+          </div>
+        </header>
+        <div class="curve-panel" id="noise-B-body">
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Underlying scalar field — drives the visual character of the islands.">Type</span>
+            <select class="curve-panel__input curve-panel__input--narrow" data-noise-layer="B" data-noise-key="type">
+              <option value="simplex">Simplex (blobs)</option>
+              <option value="ridged">Ridged (cracks)</option>
+              <option value="billowy">Billowy (clouds)</option>
+              <option value="fbm">fBm (multi-scale)</option>
+              <option value="worley">Worley (cells)</option>
+            </select>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Density</span>
+            <input class="curve-panel__slider" data-noise-layer="B" data-noise-key="density" data-role="slider" type="range" min="0" max="100" step="0.001" value="50">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="B" data-noise-key="density" data-role="value" type="number" min="0" max="100" step="0.001" value="50">
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="reset" data-noise-key="density" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="random" data-noise-key="density" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Scale</span>
+            <input class="curve-panel__slider" data-noise-layer="B" data-noise-key="scale" data-role="slider" type="range" min="0" max="100" step="0.001" value="50">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="B" data-noise-key="scale" data-role="value" type="number" min="0" max="100" step="0.001" value="50">
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="reset" data-noise-key="scale" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="random" data-noise-key="scale" title="Randomize">🎲</button>
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label" title="Fade noise near the cut edge — fraction of one cell width. 0 = no fade.">Edge fade</span>
+            <input class="curve-panel__slider" data-noise-layer="B" data-noise-key="edgeFade" data-role="slider" type="range" min="0" max="100" step="0.001" value="0">
+            <input class="curve-panel__value curve-panel__value--editable" data-noise-layer="B" data-noise-key="edgeFade" data-role="value" type="number" min="0" max="100" step="0.001" value="0">
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="reset" data-noise-key="edgeFade" title="Reset">↺</button>
+            <button class="curve-panel__btn" type="button" data-noise-layer="B" data-noise-action="random" data-noise-key="edgeFade" title="Randomize">🎲</button>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="debug">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="debug-body">
+          <h2 class="panel-section__title">Debug · fields</h2>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-on"  type="button" title="Check all">✓</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-off" type="button" title="Uncheck all">∅</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-copy"    type="button" title="Copy current selection payload to clipboard">⧉</button>
+          </div>
+        </header>
+        <div class="debug-panel" id="debug-body"></div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="debug">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="debug-layers-body">
+          <h2 class="panel-section__title">Debug · layers</h2>
+          <div class="panel-section__actions">
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-layers-all-on"  type="button" title="Show all">✓</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-layers-all-off" type="button" title="Hide all">∅</button>
+          </div>
+        </header>
+        <div class="debug-layers" id="debug-layers-body"></div>
+      </section>
+
+      <!-- Larger preview of the currently selected slot. Respects the
+           View (cuts / textures) and Show islands toggles below.
+           Prev/next buttons reroll the selected variant by ±1 to the
+           per-variant seed offset — handy when one randomly-picked tile
+           looks ugly. Disabled when previewing the template (no rng). -->
+      <section class="panel-section panel-section--preview" id="export-preview-section" data-mode="export" hidden>
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Preview</h2>
+          <span class="panel-section__meta" id="export-slot-meta"></span>
+          <div class="panel-section__actions stepper-row">
+            <div class="stepper stepper--a">
+              <button class="stepper__btn" type="button" id="export-preview-a-prev" title="Cycle pool A variant (−1)" disabled>◀</button>
+              <span class="stepper__label" id="export-preview-a-label">A-·</span>
+              <button class="stepper__btn" type="button" id="export-preview-a-next" title="Cycle pool A variant (+1)" disabled>▶</button>
+            </div>
+            <div class="stepper stepper--b">
+              <button class="stepper__btn" type="button" id="export-preview-b-prev" title="Cycle pool B variant (−1)" disabled>◀</button>
+              <span class="stepper__label" id="export-preview-b-label">B-·</span>
+              <button class="stepper__btn" type="button" id="export-preview-b-next" title="Cycle pool B variant (+1)" disabled>▶</button>
+            </div>
+            <div class="stepper stepper--seed">
+              <button class="stepper__btn" type="button" id="export-preview-prev" title="Reroll this variant (seed −1)" disabled>◀</button>
+              <span class="stepper__label" id="export-preview-seed-label">s+0</span>
+              <button class="stepper__btn" type="button" id="export-preview-next" title="Reroll this variant (seed +1)" disabled>▶</button>
+            </div>
+          </div>
+        </header>
+        <div class="export-preview" id="export-preview"></div>
+        <div class="export-preview-controls" id="export-preview-controls">
+          <div id="export-variants-body"></div>
+        </div>
+      </section>
+
+      <!-- Export-mode replacement for the preview-mode sections above.
+           Hidden unless body.export-active is set. Four sibling
+           panel-sections that mirror the preview rail's Curve/Noise
+           structure — same .panel-section__header--collapsible chrome,
+           same .curve-panel-style bodies, no extra .parameters wrap.
+           Order matters: Main sits directly under the slot preview so the
+           pack direction / variability / view controls share visual
+           proximity with the tile they describe. -->
+      <section class="panel-section panel-section--fixed" data-mode="export">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="export-main-body">
+          <h2 class="panel-section__title">Main</h2>
+          <div class="panel-section__actions">
+            <input class="curve-panel__slider panel-section__header-slider" id="export-master-share"
+                   type="range" min="0" max="1" step="0.01" value="0.75"
+                   title="Master share — how strongly the 🎲 randomizers prefer the master pool entry (0 = none, 1 = master only). Affects both pool-weight 🎲 and tile-populate 🎲.">
+            <button class="curve-panel__btn curve-panel__btn--header" id="export-variants-random-all" type="button" title="Populate every tile with N random variants. Master-biased: each variant pool slot picks master with probability = Master share, else picks among non-master variants uniformly.">🎲</button>
+          </div>
+        </header>
+        <div class="curve-panel" id="export-main-body"></div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="export">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="export-pools-body">
+          <h2 class="panel-section__title">Pools</h2>
+        </header>
+        <div class="curve-panel" id="export-pools-body"></div>
+      </section>
+
+      <section class="panel-section panel-section--fixed" data-mode="export">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="export-variability-body">
+          <h2 class="panel-section__title">Variability</h2>
+        </header>
+        <div class="curve-panel" id="export-variability-body">
+          <p class="placeholder">Click a slot to configure ranges.</p>
+        </div>
+      </section>
+
+      <!-- Template-creator mode panels. Currently holds per-template
+           authoring settings (pattern dim). Future home for cell
+           shape switch (square / triangle / …) and template kind
+           selector (pattern / shape pipeline). -->
+      <section class="panel-section panel-section--fixed" data-mode="template">
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Settings</h2>
+        </header>
+        <div class="curve-panel">
+          <!-- Cell shape always comes first — it picks which other
+               params live in the host below. Options populated from
+               listCellShapes() in JS. -->
+          <label class="curve-panel__field" title="How each slot is composed. Each shape's own settings appear below.">
+            <span class="curve-panel__label">Cell shape</span>
+            <select class="curve-panel__input" id="creator-cellshape-select"></select>
+          </label>
+          <!-- Shape-owned settings render here. Cleared and refilled
+               by the active shape's renderParams() on switch. -->
+          <div id="creator-shape-params"></div>
+        </div>
+      </section>
+
+      <!-- Generate · template tools that produce slots in bulk. Currently
+           one entry (fill missing); future generation helpers belong here. -->
+      <section class="panel-section panel-section--fixed" data-mode="template">
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Generate</h2>
+        </header>
+        <div class="curve-panel">
+          <button class="btn" id="creator-fill-missing" type="button"
+                  title="Add slots for every peering-bit combination the template doesn't already cover. Fills empty grid cells first, then extends the grid downward.">
+            Fill missing patterns
+          </button>
+          <button class="btn" id="creator-flip-pattern" type="button"
+                  title="Invert every cell across the entire template (0 ↔ 1). Applying twice restores the original — no confirm. Square cellShape only.">
+            Flip pattern
+          </button>
+        </div>
+      </section>
+
+      <!-- Bundle mode · pick which saved projects belong in the combined
+           Godot TileSet export. Selection is ad-hoc (not persisted). -->
+      <section class="panel-section panel-section--fixed" data-mode="bundle">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="bundle-projects-list">
+          <h2 class="panel-section__title">Projects</h2>
+        </header>
+        <div class="bundle-projects" id="bundle-projects-list"></div>
+      </section>
+
+      <!-- Bundle mode · final export action. Produces a ZIP with N atlas
+           PNGs + one .tres referencing them all under a shared terrain_set. -->
+      <section class="panel-section panel-section--fixed" data-mode="bundle">
+        <header class="panel-section__header">
+          <h2 class="panel-section__title">Export</h2>
+        </header>
+        <div class="curve-panel">
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Bundle name</span>
+            <input class="curve-panel__input" id="bundle-name" type="text"
+                   placeholder="bundle" spellcheck="false">
+          </label>
+          <label class="curve-panel__field">
+            <span class="curve-panel__label">Atlas path</span>
+            <input class="curve-panel__input" id="bundle-atlas-path" type="text"
+                   placeholder="(empty = root, e.g. addons/myset)"
+                   title="Subfolder where the bundle will live inside the Godot project. The .tres will reference atlases as `res://<path>/<atlas>.png`. Leading `res://` is optional — typed or not, the output is the same. Leave empty for root."
+                   spellcheck="false">
+          </label>
+          <button class="btn" id="bundle-export" type="button"
+                  title="Build a ZIP containing one atlas PNG per project + a combined .tres + one self-contained JSON per source project + a manifest with tool version, applied overrides, and atlas path prefix.">
+            Export bundle (ZIP)
+          </button>
+        </div>
+      </section>
+
+      <!-- Bundle mode · Overrides. Curated state values forced onto every
+           bundled project at export time. Singleton + persisted across
+           sessions. Row layout generated from BUNDLE_OVERRIDE_KEYS. -->
+      <section class="panel-section panel-section--fixed" data-mode="bundle">
+        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="bundle-overrides-list">
+          <h2 class="panel-section__title">Overrides</h2>
+        </header>
+        <div class="bundle-overrides" id="bundle-overrides-list"></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="drop-overlay" id="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay__message">
+      <strong>Drop image to import</strong>
+      <span class="drop-overlay__sub">SVG · PNG · JPEG · WEBP</span>
+    </div>
+  </div>
+
+  <!-- Pipeline trace overlay: centred on screen, position: fixed so it
+       sits above any mode's content. Toggled by tracePanel.js. -->
+  <aside class="trace-overlay" id="trace-overlay" hidden></aside>
+
+  <!-- Generic modal — populated/opened by JS. Hidden by default; clicking
+       the backdrop or pressing Esc closes it without committing. -->
+  <div class="modal" id="variants-random-modal" hidden>
+    <div class="modal__backdrop"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="variants-random-title">
+      <h3 class="modal__title" id="variants-random-title">Randomize variants for every tile</h3>
+      <p class="modal__hint">How many variants per tile? Each tile gets a fresh random pool A/B pick plus randomized variability ranges.</p>
+      <p class="modal__warn">⚠ Larger counts (e.g. 10 × 47 tiles in blob-47 = 470 rendered tiles) can take several seconds and may briefly freeze the browser.</p>
+      <label class="modal__field">
+        <span>Variants per tile</span>
+        <input class="modal__input" id="variants-random-count" type="number" min="1" max="10" step="1" value="1">
+      </label>
+      <div class="modal__actions">
+        <button class="btn btn--sm" type="button" id="variants-random-cancel">Cancel</button>
+        <button class="btn btn--sm btn--primary" type="button" id="variants-random-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/split.js@1.6/dist/split.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script>
+  <!-- simplex-noise — used by core/noise.js. v2 accepts a seed string
+       directly in its constructor, no separate RNG needed. UMD global:
+       `SimplexNoise`. -->
+  <script src="https://cdn.jsdelivr.net/npm/simplex-noise@2.4.0/simplex-noise.js"></script>
+  <!-- clipper-lib — robust polygon offset / boolean ops. Used by
+       core/pointGraph/ops/inflate to model the cut chain as a polygon
+       offset of the filled region (proper "elastic rubber" semantics:
+       self-intersections auto-clip, polygon collapses when over-deflated).
+       UMD global: `ClipperLib`. -->
+  <script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
+  <!-- JSZip — used by bundleMode export to pack multiple atlas PNGs + the
+       combined .tres into one download. UMD global: `JSZip`. -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+/* Reset / base typography + global body rules + drop-overlay during file drag. */
+
+/* --- Reset / base ------------------------------------------------------- */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  line-height: 1.4;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+
+/* --- Drop overlay ------------------------------------------------------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(14, 126, 196, 0.12);
+  border: 3px dashed var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.drop-overlay.is-active {
+  display: flex;
+}
+
+.drop-overlay__message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-8);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-strong);
+}
+
+.drop-overlay__sub {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+

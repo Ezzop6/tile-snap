@@ -1,0 +1,479 @@
+/* Bundle mode — stage, list of project cards, coverage matrix, right-panel project picker, overrides, progress overlay. */
+
+/* Bundle stage holds the matrix panel — make the panel fill the whole
+   stage so the project list + coverage matrix get room to breathe. */
+.bundle-stage {
+  align-items: stretch;
+  justify-content: stretch;
+}
+.bundle-matrix {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  /* Scroll inside the panel — bundle-stage stretches the panel to its
+     full height, so card / coverage overflow can't bubble up to the
+     stage's own overflow:auto. Without this, extra cards disappear off
+     the bottom edge with no way to scroll them into view. */
+  overflow-y: auto;
+  /* Anchor for the absolutely-positioned progress overlay. */
+  position: relative;
+}
+.bundle-matrix__empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: var(--space-4);
+  text-align: center;
+}
+/* Card list — each bundled entry renders as one horizontal card with
+   four sections: project + template info, pool thumbs, stats, actions.
+   Replaces the earlier 8-column grid which got cramped once tile counts
+   + source badges came in. */
+.bundle-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+.bundle-card {
+  display: flex;
+  align-items: stretch;
+  /* Spread the sections — project anchors left, actions right, pools and
+     stats share the remaining space evenly so the card fills its width. */
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated, var(--color-bg));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  /* Left-edge accent reserves space for the reverse marker. Forward
+     cards leave it transparent so cards align flush. */
+  border-left: 3px solid transparent;
+}
+/* Subtle marker — left accent stripe only. Text colour stays normal so
+   the metadata is readable. */
+.bundle-card--reversed {
+  border-left-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-elevated, var(--color-bg)));
+}
+/* Defensive flag — saved blob references a template that's no longer in
+   storage. Bundle export is blocked until user re-saves the project with
+   a valid template. Card stays clickable for inspection but visually
+   reads as "broken". */
+.bundle-card--invalid {
+  border-color: #b04040;
+  background: rgba(176, 64, 64, 0.10);
+}
+.bundle-card__meta--error {
+  color: #ff8888;
+  font-weight: 500;
+}
+.bundle-card__section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Left-most: project name + template metadata stacked. Grows so the
+   row stretches and the rightmost actions hug the right edge. */
+.bundle-card__section--project {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+.bundle-card__name {
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.bundle-card--reversed .bundle-card__name {
+  font-weight: 500;
+}
+.bundle-card__meta {
+  font-size: var(--font-size-xs, 10px);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+}
+.bundle-card__meta--sub {
+  opacity: 0.8;
+}
+/* Pools: thumb + name | arrow | thumb + name. Grow a bit so the section
+   stretches alongside project / stats when the card has extra room. */
+.bundle-card__section--pools {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.bundle-card__pool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.bundle-card__arrow {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  padding: 0 4px;
+}
+/* Open action — small inline button between pools + stats. Shrinks first
+   if the card runs out of width (other sections are content-anchored). */
+.bundle-card__section--open {
+  flex: 0 0 auto;
+}
+.bundle-card__open-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Stats column: stack tile-count line and source-badge line. */
+.bundle-card__section--stats {
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 110px;
+}
+.bundle-card__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+}
+.bundle-card__stat--sources {
+  gap: 4px;
+}
+.bundle-card__section--actions {
+  flex: 0 0 auto;
+}
+
+/* Vertical stack of icon buttons in one box. ↔ on top, × below. No
+   text — the icons + titles tell the story and the card stays tight. */
+.bundle-card__action-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bundle-card__icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.bundle-card__icon-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.bundle-card__icon-btn--danger:hover {
+  border-color: var(--color-error, #d65a5a);
+  color: var(--color-error, #d65a5a);
+}
+
+/* Shared bits used inside the card (re-used from the older table). */
+.bundle-matrix__sub {
+  font-size: var(--font-size-xs, 10px);
+  color: var(--color-text-muted);
+}
+.bundle-matrix__src-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs, 10px);
+  opacity: 0.35;
+}
+.bundle-matrix__src-badge.is-on {
+  opacity: 1;
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* Progress overlay shown while bundle export is running. Sits absolute
+   inside .bundle-matrix so it covers the cards (which keep their layout
+   underneath but are visually hidden). Lets the export driver report
+   per-project status + offers an abort. */
+.bundle-progress {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  z-index: 5;
+}
+.bundle-progress__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  min-width: 280px;
+}
+.bundle-progress__title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.bundle-progress__status {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+}
+.bundle-progress__bar {
+  width: 100%;
+  height: 6px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.bundle-progress__bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  width: 0;
+  transition: width 0.15s ease;
+}
+.bundle-matrix__thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  flex: 0 0 auto;
+  /* Sharpen tiny tile previews — bilinear blur defeats the point. */
+  image-rendering: pixelated;
+  object-fit: cover;
+}
+.bundle-matrix__thumb--empty {
+  display: inline-block;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.04) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+.bundle-matrix__name {
+  font-family: var(--font-mono, monospace);
+}
+.bundle-matrix__name--fallback {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Terrain coverage matrix — N×N table of bundle-wide unique terrains.
+   Cells highlight covered pairs (= at least one bundled project handles
+   that transition) vs. missing pairs so the user can spot gaps before
+   exporting. Lives below the project list inside the same bundle stage. */
+.bundle-coverage {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.bundle-coverage__summary {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+  width: 100%;
+  display: block;
+}
+.bundle-coverage__table {
+  display: grid;
+  gap: 3px;
+  font-size: var(--font-size-sm);
+  /* width: max-content keeps the matrix at its natural size — column
+     widths are capped via minmax so it stops growing past the stage.
+     margin auto + max-width centres it horizontally within .bundle-coverage. */
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  /* Anchor the first row near top so rotated col-heads have room above. */
+  align-content: start;
+}
+.bundle-coverage__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  /* Square: cell height matches its column width (capped via minmax). */
+  aspect-ratio: 1 / 1;
+}
+.bundle-coverage__cell--head {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  /* Header cells stay text-only; opt out of the square ratio so the
+     row header doesn't grow into a giant box. */
+  aspect-ratio: auto;
+}
+.bundle-coverage__cell--row-head {
+  min-width: 80px;
+  width: auto;
+  padding: 0 var(--space-1);
+  justify-content: flex-end;
+}
+/* Column headers tilt -45° so long terrain names fit above narrow cells.
+   Cell stays in-grid; the label span rotates around its bottom-left so the
+   diagonal extends up-and-to-the-right above the column below. */
+.bundle-coverage__cell--col-head {
+  height: 80px;
+  align-items: flex-end;
+  overflow: visible;
+  position: relative;
+  background: transparent;
+  border-color: transparent;
+  min-height: 0;
+}
+.bundle-coverage__col-label {
+  display: inline-block;
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs, 10px);
+}
+.bundle-coverage__cell--diagonal {
+  background: var(--color-bg-elevated, var(--color-bg));
+  color: var(--color-text-faint);
+  border-color: transparent;
+}
+.bundle-coverage__cell--covered {
+  background: rgba(80, 200, 120, 0.25);
+  color: rgb(120, 230, 150);
+  border-color: rgba(80, 200, 120, 0.6);
+}
+/* Reverse-only: the unordered pair IS covered (=  Godot painter has tiles
+   for the transition), but no project handles THIS exact direction. Amber
+   tint so it reads as "partial coverage" — not as bad as missing, not
+   fully covered either. */
+.bundle-coverage__cell--reverse-only {
+  background: rgba(230, 180, 60, 0.18);
+  color: rgb(230, 200, 100);
+  border-color: rgba(230, 180, 60, 0.5);
+}
+.bundle-coverage__cell--missing {
+  background: rgba(220, 90, 90, 0.15);
+  border-color: rgba(220, 90, 90, 0.4);
+}
+
+/* Right-panel project picker — saved projects with checkbox + thumb.
+   Independent from the main project picker (which switches active project).
+   Capped height + scroll keeps the rest of the bundle panel reachable when
+   the user has many saved projects. */
+.bundle-projects {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+.bundle-project {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.bundle-project:hover {
+  background: var(--color-bg-elevated, var(--color-bg));
+}
+.bundle-project__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+.bundle-project__active {
+  font-size: var(--font-size-xs, 10px);
+  color: var(--color-text-muted);
+}
+/* Bundle Overrides section — per-param rows with toggle + control.
+   Layout mirrors curve-panel fields but compact (no large reset/random
+   chrome). The slider takes the remaining horizontal space. */
+.bundle-overrides {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.bundle-override {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bundle-override__label {
+  /* Label sits at the row's end — size to its own text rather than
+     reserve fixed space so the control (color picker / slider) gets the
+     bulk of the row width. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.bundle-override__value {
+  flex: 0 0 56px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 1px var(--space-1);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+.bundle-override__value:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.bundle-override__color {
+  flex: 0 0 32px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+/* Dim the row's controls + label when override is off so the user sees
+   at a glance that it won't apply at export. */
+.bundle-override:has(input[type="checkbox"]:not(:checked)) .bundle-override__label,
+.bundle-override:has(input[type="checkbox"]:not(:checked)) .bundle-override__value,
+.bundle-override:has(input[type="checkbox"]:not(:checked)) .bundle-override__color {
+  opacity: 0.4;
+}
+

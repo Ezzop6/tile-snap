@@ -1,0 +1,486 @@
+/* Sources left panel — source slot, pool rows (Sources), pool weights (Export), input cards. */
+
+/* --- Source slot (top of left panel) ---------------------------------- */
+
+.panel-section--fixed {
+  flex: 0 0 auto;  /* don't let .panel-section:last-child rule grab vertical room */
+}
+
+/* --- Pool rows (Sources panel) ---------------------------------------- */
+
+.pool-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Padding matches .curve-panel on the right rail so left + right
+     panel bodies sit at the same indent from the section edge. */
+  padding: var(--space-2) var(--space-3);
+}
+
+.pool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Card layout: stacks header + body vertically. Header carries identity
+   (A/B chip, terrain name, trash); body keeps the existing items + add row. */
+.pool-row--card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.pool-row__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-elevated, var(--color-bg));
+  border-bottom: 1px solid var(--color-border);
+}
+.pool-row__body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.pool-row__label {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+/* Pool side colour — matches the rings drawn on input tiles so a
+ * single glance ties "this row" to "those rings". */
+.pool-row[data-pool="A"] .pool-row__label { background: var(--color-pool-a); }
+.pool-row[data-pool="B"] .pool-row__label { background: var(--color-pool-b); }
+
+.pool-row__items {
+  flex: 1 1 auto;
+  min-width: 0; /* allow shrink so overflow-x can actually scroll */
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--space-1);
+  /* thumb 96 + 2px padding top/bottom + ~20px reserved for horizontal
+   * scrollbar so the scrollbar never covers the last row of pixels.
+   * scrollbar-gutter would be cleaner but Firefox renders it weirdly
+   * for overflow-x; explicit padding-bottom is more predictable. */
+  height: 124px;
+  padding: 2px;
+  padding-bottom: 20px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.pool-row__empty {
+  align-self: center;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Add-button stack: big "+" on top, smaller "⊞ all" + "🎲" below.
+ * Kept narrow so the row keeps real estate for the thumbnails. */
+.pool-row__add-group {
+  flex: 0 0 64px;
+  min-width: 56px;
+  max-width: 72px;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pool-row__add {
+  flex: 2 1 0;             /* take ~⅔ of the column height */
+  min-width: 0;
+  padding: 0;
+  background: var(--color-bg-elevated);
+  border: 2px dashed currentColor;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pool-row__add-rest {
+  flex: 1 1 0;             /* remaining ~⅓ */
+  min-width: 0;
+  padding: 0;
+  background: var(--color-bg-elevated);
+  border: 1px dashed currentColor;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* + and "⊞ all" buttons tinted to match their pool side. */
+.pool-row[data-pool="A"] .pool-row__add,
+.pool-row[data-pool="A"] .pool-row__add-rest { color: var(--color-pool-a); }
+.pool-row[data-pool="B"] .pool-row__add,
+.pool-row[data-pool="B"] .pool-row__add-rest { color: var(--color-pool-b); }
+
+.pool-row__add:hover:not(:disabled),
+.pool-row__add-rest:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+  border-style: solid;
+}
+
+.pool-row__add:disabled,
+.pool-row__add-rest:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* A / B label chip + trash icon, stacked vertically on the left
+ * edge of the pool row. */
+
+/* Terrain-name input lives in the card header next to the A/B chip.
+   Stretches to fill the header so long names stay readable; the user
+   types the identifier that lands as the terrain name in exported .tres. */
+.pool-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 2px 6px;
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+.pool-row__name:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.pool-row__name::placeholder {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+/* Tiny trash icon at the right edge of the card header. Tinted to
+ * match the pool side so the visual binding is obvious. */
+.pool-row__clear {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.pool-row__clear[data-pool-clear="A"] { color: var(--color-pool-a); }
+.pool-row__clear[data-pool-clear="B"] { color: var(--color-pool-b); }
+
+.pool-row__clear:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pool-row__clear:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pool-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  background:
+    linear-gradient(45deg, var(--color-bg-panel) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, var(--color-bg-panel) 25%, transparent 25%) 0 8px / 16px 16px,
+    linear-gradient(45deg, transparent 75%, var(--color-bg-panel) 75%) 8px -8px / 16px 16px,
+    linear-gradient(-45deg, transparent 75%, var(--color-bg-panel) 75%) -8px 0 / 16px 16px,
+    var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* Master border tinted by its parent pool side. */
+.pool-row[data-pool="A"] .pool-thumb--master { border: 2px solid var(--color-pool-a); }
+.pool-row[data-pool="B"] .pool-thumb--master { border: 2px solid var(--color-pool-b); }
+
+.pool-thumb__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.pool-thumb__missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.pool-thumb__badge {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  z-index: 2;
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+
+.pool-thumb__remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pool-thumb__remove:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+/* --- Pool weights (Export panel) -------------------------------------- */
+
+.pool-weights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-2);
+}
+
+.pool-weights__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pool-weights__name { flex: 1 1 auto; }
+
+.pool-weights__chevron {
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+  font-size: 9px;
+  transition: transform 0.12s ease;
+}
+
+.pool-weights.is-collapsed .pool-weights__chevron {
+  transform: rotate(-90deg);
+}
+
+.pool-weights.is-collapsed .pool-weights__body {
+  display: none;
+}
+
+/* Body of one pool's weights is a grid of texture-on-top + weight-below
+   cells (= thumb is big enough to actually identify the tile). Auto-fit
+   wraps as many columns as the panel width allows. */
+.pool-weights__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: var(--space-2);
+}
+
+.pool-weight {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.pool-weight__thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+/* Master entry (index 0) — accent outline so the user can tell it apart
+   from variants at a glance. */
+.pool-weight.is-master .pool-weight__thumb {
+  border-color: var(--color-accent);
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.pool-weight__thumb--missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.pool-weight__value {
+  width: 100%;
+  height: 22px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  text-align: center;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+
+/* --- Input card (one per imported source) ----------------------------- */
+
+.input-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  /* Horizontal margin matches .pool-rows + .curve-panel (12px) so all
+     panel-section bodies sit at the same indent regardless of side. */
+  margin: var(--space-1) var(--space-3);
+  overflow: hidden;
+}
+
+.input-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.input-card__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.input-card__delete {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.input-card__delete:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
+  color: var(--color-text-strong);
+}
+
+.input-card__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.input-card__tile-size-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.input-card__tile-size {
+  width: 50px;
+  padding: 2px var(--space-1);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.input-card__tile-size:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.input-card__info {
+  margin-left: auto;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.input-card__preview {
+  padding: var(--space-1);
+  background:
+    linear-gradient(45deg, var(--color-bg-panel) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, var(--color-bg-panel) 25%, transparent 25%) 0 6px / 12px 12px,
+    linear-gradient(45deg, transparent 75%, var(--color-bg-panel) 75%) 6px -6px / 12px 12px,
+    linear-gradient(-45deg, transparent 75%, var(--color-bg-panel) 75%) -6px 0 / 12px 12px,
+    var(--color-bg);
+}
+
+.input-card__preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+

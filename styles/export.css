@@ -1,0 +1,256 @@
+/* Export mode — stage container, layout grid of tiles, preview controls, selection frame, variability range sliders. */
+
+/* Export stage hosts the layout grid full-area. Pan/zoom is applied
+   to the grid via CSS transform (driven from exportPanel.js — wheel
+   to zoom, middle-mouse drag to pan), matching the mainView behaviour.
+   `overflow: hidden` is required so the transformed grid doesn't
+   produce browser scrollbars competing with the manual pan. */
+.export-stage {
+  overflow: hidden;
+}
+
+/* Compact "View" row in the Export panel: Cuts / Textures radios +
+ * Islands checkbox sit on one line so the whole View control occupies
+ * one row instead of three separate stretched fields. */
+.export-view-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.export-view-row__opts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+}
+
+.export-view-row__opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.export-view-row__opt input {
+  margin: 0;
+}
+
+/* Layout grid = single CSS grid containing every tile (template +
+   variants). Template tiles placed at (slot.col, slot.row); variant
+   tiles at the (col, row) the 2D packer chose. One grid = one column
+   rhythm = pixel-perfect alignment everywhere.
+   `data-direction` is informational only (used by some debug rules);
+   the actual placement comes from inline gridColumn / gridRow. */
+.layout-grid {
+  display: flex;
+  align-items: flex-start;
+}
+.layout-grid__full {
+  display: grid;
+  gap: 0;
+  position: relative;     /* anchor for absolute children (template-frame) */
+}
+
+/* Preview controls strip: slot meta + Variants slider below the preview
+   canvas. Hidden by JS when no slot is selected. */
+.export-preview-controls {
+  padding: 0 var(--space-3) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.export-preview-controls[hidden] { display: none; }
+.export-preview-controls .panel-section__meta:empty { display: none; }
+
+/* Bigger preview of the selected slot in the right panel — same
+   render pipeline as layout tiles, just scaled up. Centered with
+   padding, pixelated upscale so pixel art stays crisp. */
+.export-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+}
+
+/* When previewing a variant tile, the steppers are the only thing
+ * worth surfacing in the section header — hide the "Preview" title
+ * and let the stepper row center itself across the full header width. */
+.panel-section.is-variant-preview .panel-section__title { display: none; }
+.panel-section.is-variant-preview .panel-section__header { justify-content: center; }
+.panel-section.is-variant-preview .panel-section__actions { margin: 0 auto; }
+.export-preview canvas {
+  display: block;
+  /* Same checker as main / export / creator stages so the side
+     preview matches the rest. */
+  background: var(--checker-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  /* image-rendering set by `.render-pixel` / `.render-smooth` classes
+     added via applyRenderModeClass — pixel mode = crisp upscale,
+     smooth mode = browser default. width / height set inline by
+     exportPanel.js to a square that fits the host's available area. */
+}
+.export-preview .placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Layout tile = native-resolution composite render (cuts always, noise
+   only when state.exportShowIslands). CSS scales to display size with
+   pixelated rendering so the upscale matches what the export PNG will
+   contain. */
+.layout-tile {
+  display: block;
+  /* Transparent so the export-stage checker shows through unrendered
+     / transparent regions of each tile (= same visual contract as the
+     preview's main-stage). No border/radius — adjacent tiles touch
+     edge-to-edge so seams stay visible without grid lines breaking
+     them up. Variants are identified by the corner pattern marker,
+     not by an outline. */
+  background: transparent;
+  cursor: pointer;
+}
+/* Group membership marker. Sibling div placed in the SAME CSS grid
+   cell as the tile canvas (canvas is a replaced element so ::before /
+   ::after don't render — the marker is its own div). Draws a two-tone
+   corner triangle (dark outer + lighter inner) so it stays visible
+   on top of any tile colour. Pointer events off so the tile under
+   it stays clickable. */
+/* Top-right square marker showing the slot's pattern as a tiny grid.
+   Outline (= contrast frame) reads on any tile colour; "on" cells use
+   the per-group hue so the marker doubles as a colour-coded slot
+   identifier + a glance-readable pattern preview. */
+.tile-group-marker {
+  position: relative;
+  pointer-events: none;
+  z-index: 2;
+  display: grid;
+  justify-self: end;
+  align-self: start;
+  margin: 2px;
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.65);
+  outline: 1px solid #000;
+  outline-offset: -1px;
+}
+.tile-group-marker__cell {
+  background: transparent;
+}
+.tile-group-marker__cell.is-on {
+  background: var(--slot-group-color, #ffe600);
+}
+/* Selection frame: sibling grid item sharing the selected tile's cell.
+   Box-sizing border-box keeps the 2px frame inside cell bounds so it
+   never bleeds onto adjacent tiles. Pointer-events off so clicks go
+   through to the tile beneath. z-index above the marker. */
+.tile-selection-frame {
+  pointer-events: none;
+  border: 2px solid var(--color-warn, #ffcc00);
+  box-sizing: border-box;
+  z-index: 3;
+}
+
+/* Variability ranges block inside the export Variability section. */
+.export-ranges {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.export-ranges__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.export-range {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.export-range:last-child { border-bottom: none; }
+.export-range__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.export-range__label {
+  flex: 1 1 auto;
+  color: var(--color-text);
+  font-weight: 500;
+}
+.export-range__current {
+  flex: 0 0 auto;
+  padding: 1px var(--space-1);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Min/max sliders side-by-side on one row. Tight spacing — the panel
+   is narrow but the sliders flex-grow so they share the remaining
+   width evenly. */
+.export-range__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.export-range__tag {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+}
+/* Range sliders measure DELTAS around the current global value,
+   bounded by ±variability×100 (a global scope param). The slider's
+   value=0 is therefore always "current"; user drags to either side
+   to define the variant range. */
+.export-range__slider {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+.export-range__value {
+  flex: 0 0 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+input.export-range__value--editable {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 1px 3px;
+  font: inherit;
+}
+input.export-range__value--editable:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+input.export-range__value--editable::-webkit-outer-spin-button,
+input.export-range__value--editable::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input.export-range__value--editable[type="number"] {
+  -moz-appearance: textfield;
+}
+

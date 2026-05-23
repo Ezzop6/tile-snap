@@ -1,0 +1,145 @@
+/* Reusable primitives — .btn variants, .list, .placeholder, common sliders, color pickers. */
+
+/* --- Reusable primitives ------------------------------------------------ */
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.btn:active {
+  background: var(--color-bg-active);
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover,
+.btn[disabled]:hover {
+  background: transparent;
+  border-color: var(--color-border);
+}
+
+.btn--ghost {
+  border-color: transparent;
+}
+
+.btn--icon {
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Inputs list = optional N-column grid; columns set inline by JS via
+   --inputs-cols. Falls back to 1 if the variable is missing. */
+.inputs-list {
+  display: grid;
+  grid-template-columns: repeat(var(--inputs-cols, 1), 1fr);
+  gap: 2px;
+  padding: var(--space-1);
+}
+
+/* Cards inside the grid drop their legacy margin — grid `gap` controls spacing. */
+.inputs-list .input-card { margin: 0; }
+.inputs-list .input-card.is-hidden { display: none; }
+
+.inputs-toolbar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.inputs-toolbar__search {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+}
+.inputs-toolbar__search:focus-within {
+  border-color: var(--color-accent);
+}
+.inputs-toolbar__icon {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.inputs-toolbar__search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: 2px 0;
+}
+.inputs-toolbar__cols {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.inputs-toolbar__cols-input {
+  width: 42px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: 2px 4px;
+}
+.inputs-toolbar__cols-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.list:empty::before {
+  content: attr(data-empty);
+  display: block;
+  padding: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+  font-style: italic;
+  text-align: center;
+}
+
+.placeholder {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--color-text-faint);
+  font-style: italic;
+  text-align: center;
+}
+

@@ -1,0 +1,33 @@
+/*
+ * Main stylesheet — split into feature files for navigability.
+ * tokens.css is loaded separately by index.html (kept as <link> so design
+ * tokens are available immediately, not blocked behind this index file).
+ *
+ * Order matters for the cascade:
+ *   1. base       — reset + body + drop overlay
+ *   2. layout     — topbar, workspace shell, canvas area, gutters
+ *   3. modes      — shared stage box (creator/export/debug/bundle) + body.X-active
+ *                   visibility. Imported here so feature files below can override
+ *                   the shared stage defaults (e.g. bundle stretches instead of
+ *                   centering). !important rules in this file still win regardless
+ *                   of cascade position.
+ *   4. primitives — .btn, .list, .placeholder, sliders
+ *   5. panels     — right-panel parameter sections + Texture · global
+ *   6. sources    — left-panel inputs + pool rows + pool weights
+ *   7. curve      — Curve / Noise panel internals
+ *   8. creator    — Template-creator modal + editor grid
+ *   9. bundle     — Bundle mode (stage, cards, coverage, overrides)
+ *  10. export     — Export mode (layout grid + variability ranges)
+ */
+@import "base.css";
+@import "layout.css";
+@import "modes.css";
+@import "primitives.css";
+@import "panels.css";
+@import "sources.css";
+@import "curve.css";
+@import "creator.css";
+@import "bundle.css";
+@import "export.css";
+@import "dialog.css";
+@import "projectModal.css";

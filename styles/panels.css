@@ -1,0 +1,383 @@
+/* Right-panel sections — parameter sections (preview/debug modes) + Texture · global panel. */
+
+/* --- Right panel: parameters ------------------------------------------- */
+
+.parameters {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.slot-editor__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-editor__canvas {
+  display: block;
+  background: var(--color-bg);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.slot-editor__canvas:active {
+  cursor: grabbing;
+}
+
+.slot-override {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.slot-override__row {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.slot-override__label {
+  flex: 0 0 auto;
+  width: 18px;
+  padding: 1px 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+/* Match the A / B colour scheme used everywhere else in the pool flow. */
+.slot-override__row[data-pool="A"] .slot-override__label { background: var(--color-pool-a); }
+.slot-override__row[data-pool="B"] .slot-override__label { background: var(--color-pool-b); }
+
+.slot-override__select {
+  flex: 1 1 auto;
+  height: 22px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  padding: 0 4px;
+}
+
+.slot-override__select:disabled {
+  opacity: 0.5;
+}
+
+.cut-transform {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.cut-transform__label {
+  flex: 0 0 auto;
+  width: 56px;
+  padding: 1px 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  margin-top: 1px;
+}
+
+.cut-transform__btns,
+.texture-transform__btns {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.cut-transform__btn,
+.texture-transform__btn {
+  flex: 1 1 0;
+  min-width: 28px;
+  height: 22px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  padding: 0 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cut-transform__btn--cycle,
+.texture-transform__btn--cycle {
+  flex: 1.4 1 0;
+}
+
+.cut-transform__btn:hover:not(:disabled),
+.texture-transform__btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.cut-transform__btn:disabled,
+.texture-transform__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.texture-transform {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.texture-transform__row {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.texture-transform__row[data-pool="A"] .texture-transform__label { background: var(--color-pool-a); }
+.texture-transform__row[data-pool="B"] .texture-transform__label { background: var(--color-pool-b); }
+
+.texture-transform__label {
+  flex: 0 0 auto;
+  width: 18px;
+  padding: 1px 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+
+/* --- Texture · global panel -------------------------------------------- */
+.tex-ops {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tex-ops__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tex-ops__pool-switch {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.tex-ops__pool-btn {
+  height: 22px;
+  padding: 0 10px;
+  background: var(--color-bg-elevated);
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tex-ops__pool-btn:first-child { border-left: 0; }
+
+.tex-ops__pool-btn[data-pool="A"].is-active { background: var(--color-pool-a); color: #fff; }
+.tex-ops__pool-btn[data-pool="B"].is-active { background: var(--color-pool-b); color: #fff; }
+
+.tex-ops__stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-1);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.tex-ops__canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.tex-ops__category {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.tex-ops__category:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.tex-ops__cat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* L2 category header — same size as the L1 section title, but bolder
+   so the visual hierarchy reads "section → bold category → ops". */
+.tex-ops__cat-title {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tex-ops__cat-title::before {
+  content: "▾";
+  display: inline-block;
+  margin-right: 6px;
+  font-size: var(--font-size-md);
+  transition: transform 0.12s ease;
+}
+
+.tex-ops__category.is-collapsed .tex-ops__cat-header {
+  margin-bottom: 0;
+}
+
+.tex-ops__category.is-collapsed .tex-ops__cat-title::before {
+  transform: rotate(-90deg);
+}
+
+.tex-ops__category.is-collapsed > :not(.tex-ops__cat-header) {
+  display: none;
+}
+
+.tex-ops__op {
+  padding-left: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* L3 op label — same size as category, but text colour (not muted)
+   and no uppercase so it reads as a "heading" within the category. */
+.tex-ops__op-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Wide mode: panel wider than half the viewport. Layout becomes a
+   two-column grid — preview on the left (sticky so it stays put while
+   the user scrolls), categories on the right. Categories themselves
+   can multi-column if their half has enough width. */
+.tex-ops.is-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "toolbar toolbar"
+    "stage   ops";
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.tex-ops.is-wide .tex-ops__toolbar { grid-area: toolbar; }
+
+.tex-ops.is-wide .tex-ops__stage {
+  grid-area: stage;
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+/* CSS multi-column auto-balances heights — taller categories distribute
+   across columns so we don't end up with one ultra-long column and one
+   half-empty. column-width acts like auto-fit minmax: as many columns
+   as fit at ≥260px each. break-inside on the items keeps each category
+   intact (no splitting across columns). */
+.tex-ops.is-wide .tex-ops__ops {
+  grid-area: ops;
+  column-width: 260px;
+  column-gap: var(--space-3);
+  column-fill: balance;
+}
+
+.tex-ops.is-wide .tex-ops__category {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: var(--space-4);
+}
+
+/* Tex-ops fields: force single-row layout via flexbox (label + slider +
+   value + reset side by side, no wrapping). Overrides the base
+   .curve-panel__field grid (which puts label on its own row). */
+.tex-ops .curve-panel__field {
+  display: flex !important;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tex-ops .curve-panel__label {
+  grid-column: auto;
+  flex: 0 0 auto;
+  width: 80px;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tex-ops .curve-panel__slider {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.tex-ops .curve-panel__value {
+  flex: 0 0 auto;
+}
+
+.tex-ops .curve-panel__btn {
+  flex: 0 0 auto;
+}
+
+.tex-ops .curve-panel__field select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.tex-ops.is-wide .tex-ops__category {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.tex-ops.is-wide .tex-ops__category.is-collapsed > :not(.tex-ops__cat-header) {
+  display: block;
+}
+
+.tex-ops.is-wide .tex-ops__category.is-collapsed .tex-ops__cat-title::before {
+  transform: rotate(0);
+}
+
+
