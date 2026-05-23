@@ -9,7 +9,7 @@
 // neighbouring slots at any non-1x zoom; using REF here is the fix.
 
 import { state } from "../../controller/state.js";
-import { buildNoiseMask, applyEdgeFade } from "../../core/noise.js";
+import { buildNoiseMask } from "../../core/noise.js";
 import { withSlotTransform } from "./viewTransform.js";
 import { REFERENCE_SLOT_SIZE } from "./buildSlotGraph.js";
 
@@ -43,13 +43,9 @@ function drawLayer(ctx, slot, segments, layer, side, seed, shouldShow) {
     layer,
     seed,
   );
-  // Match the pipeline noise op: same edge-fade pass so the overlay shows
-  // the same cells that actually become noise chains.
-  if (layer.edgeFade > 0) {
-    const cols = Math.max(1, slot.array?.[0]?.length || 1);
-    const fadePx = layer.edgeFade * (REFERENCE_SLOT_SIZE / cols);
-    applyEdgeFade(mask, segments, fadePx);
-  }
+  // Edge fade is now a composition step (merge op) on the vector cut, not a
+  // mask pass — so this tint shows the RAW noise region; the actual faded-back
+  // result is what slotComposite renders. (Overlay = approximate debug aid.)
   const wantInside = side === "holes";
   ctx.save();
   ctx.fillStyle = color;

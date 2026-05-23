@@ -1,4 +1,4 @@
-import { buildNoiseMask, applyEdgeFade } from "../../../noise.js";
+import { buildNoiseMask } from "../../../noise.js";
 
 const MIN_LOOP_VERTICES = 3;
 
@@ -23,21 +23,11 @@ export function noiseImpl(graph, opts = {}) {
     seed,
   );
 
-  // Boundary segments drive both the cut-region pre-mask and the edge fade —
-  // collect once and share (walking every connection twice was wasteful).
-  const segments = collectBoundarySegments(graph);
-
+  // Constrain raw noise islands to the current cut region (holes inside filled,
+  // patches inside empty). Edge fade is NOT done here — it's a composition
+  // concern handled in the merge op, which actually has the cut-mask geometry.
   const wantInside = params.side === "holes";
-  preMaskByCutRegion(mask, segments, wantInside);
-
-  // Edge-aware fade: noise weakens near the cut/closure boundary so noise
-  // islands sit deeper in the region and the cut edge reads clean. Default
-  // (params.edgeFade = 0) is a no-op so existing projects don't shift.
-  if (params.edgeFade > 0) {
-    const cols = Math.max(1, graph.meta.cols || 1);
-    const fadePx = params.edgeFade * (size / cols);
-    applyEdgeFade(mask, segments, fadePx);
-  }
+  preMaskByCutRegion(mask, collectBoundarySegments(graph), wantInside);
 
   const loops = traceLoops(mask);
   if (!loops.length) return graph;

@@ -2,182 +2,190 @@ import { settings } from "../controller/storage.js";
 import { CORNER_COLOR, CORNER_LABEL, ROLE_COLOR } from "../core/pointGraph/render.js";
 import { NOISE_OVERLAY_COLORS } from "./render2/noiseOverlay.js";
 
-const FIELDS_KEY = "debugFields";
-const LAYERS_KEY = "debugLayers";
+// Single source of truth for the Debug panel. ONE list of "aspects": each is a
+// debug facet that BOTH draws on the canvas (if it has a visual) AND contributes
+// data to the clipboard payload. Toggling an aspect on = you see it AND you copy
+// it, so the user's visual matches the data handed off for debugging.
+//
+// Persisted under one settings key. Drawing reads isAspectActive(key) (drawGraph
+// + overlays); the clipboard builder (debug/click.js) reads the same keys.
 
-// Orange used for the merged-cut overlay; matches drawGraph DEFAULTS.mergedCutColor.
+const ASPECTS_KEY = "debugAspects";
+
+// Orange = merged-cut overlay (matches drawGraph mergedCutColor).
 const MERGED_CUT_COLOR = "#ff9933";
-// Purple matches drawGraph DEFAULTS.noiseCutColor — same value, here for the swatch.
+// Purple = noise cut chains (matches drawGraph noiseCutColor).
 const NOISE_CUT_COLOR = "#cc88ff";
 
 export { NOISE_OVERLAY_COLORS };
 
-export const FIELDS = {
-  slot: ["index", "col", "row", "array", "origin",
-         "terrainMode", "gridKind", "connectedSaddle",
-         "seed", "globalCurve", "noiseParams",
-         "graph", "inflateDebug", "pointPositions", "arcs"],
-  point: ["id", "basePos", "pos", "lock", "cornerType", "outwardNormal",
-          "miterScale", "cutDegree", "chainEndpoint", "slot"],
-  connection: ["id", "from", "to", "kind", "role", "curve",
-               "interiorSide", "chainId", "chordLen", "slot"],
-};
-
+// cornerTypes the build/ops pipeline actually produces. interior/exterior are
+// structural (count 0 / 4), default off — they exist in the data but aren't
+// usually interesting to look at.
 const CORNER_TYPES = [
   "outer-convex", "edge-midpoint", "outer-concave", "saddle",
-  "bridge-corner", "soften-vertex", "wave-vertex",
-  "noise-vertex", "merged-vertex",
+  "bridge-corner", "soften-vertex", "wave-vertex", "noise-vertex", "merged-vertex",
 ];
+const CORNER_TYPES_STRUCTURAL = ["interior", "exterior"];
 
-// `defaultOff: true` flips the bootstrap default — used for role.merged so
-// the boolean-union overlay doesn't hide the underlying red cuts on first
-// open. User toggle still persists normally once changed.
-export const LAYERS = [
+// `defaultOff: true` flips the bootstrap default for noisy / heavy aspects.
+export const ASPECTS = [
+  // Connections — stroke on canvas + copies those connections (id/from/to/curve/
+  // role/kind/chordLen, plus interiorSide/chainId when their decoration is on).
+  { group: "Connections", key: "role.cut",      swatch: { kind: "line", color: ROLE_COLOR.cut },      label: "cut (visible terrain edge)" },
+  { group: "Connections", key: "role.closure",  swatch: { kind: "line", color: ROLE_COLOR.closure },  label: "closure (slot edge, filled side)" },
+  { group: "Connections", key: "role.internal", swatch: { kind: "line", color: ROLE_COLOR.internal }, label: "internal (invisible edge)", defaultOff: true },
+  { group: "Connections", key: "role.noise",    swatch: { kind: "line", color: NOISE_CUT_COLOR },     label: "noise cut chain (marching squares)" },
+  { group: "Connections", key: "role.merged",   swatch: { kind: "line", color: MERGED_CUT_COLOR },    label: "merged-cut (boolean cut ∪/∖ noise)", defaultOff: true },
+
+  // Connection decorations — draw-only hints; toggling also adds the matching
+  // field (interiorSide / chainId) to copied connections.
+  { group: "Connection decorations", key: "decoration.chainOffset", swatch: { kind: "offsetPair" }, label: "chainId hue (parallel offset) → chainId" },
+  { group: "Connection decorations", key: "decoration.sideTick",    swatch: { kind: "sideTick" },   label: "interiorSide tick (→ filled cell) → interiorSide" },
+
+  // Points · cornerType — ring on canvas + copies points of that type.
   ...CORNER_TYPES.map((t) => ({
-    group: "Points · cornerType (outer ring)",
-    key:   `corner.${t}`,
-    swatch:{ kind: "ring", color: CORNER_COLOR[t] },
-    label: CORNER_LABEL[t],
+    group: "Points · cornerType", key: `corner.${t}`,
+    swatch: { kind: "ring", color: CORNER_COLOR[t] }, label: CORNER_LABEL[t],
   })),
-  { group: "Points · markers (inner)", key: "marker.lockRing",     swatch: { kind: "lockRing" },     label: "locked point (inner ring)" },
-  { group: "Points · markers (inner)", key: "marker.endpointDot",  swatch: { kind: "endpointDot" },  label: "chain endpoint (cutDegree = 1)" },
-  { group: "Points · markers (inner)", key: "marker.branchSquare", swatch: { kind: "branchSquare" }, label: "chain branch (cutDegree ≥ 3)" },
-  { group: "Connections · role (stroke)", key: "role.cut",      swatch: { kind: "line",       color: ROLE_COLOR.cut },      label: "cut (visible terrain edge)" },
-  { group: "Connections · role (stroke)", key: "role.noise",    swatch: { kind: "line",       color: NOISE_CUT_COLOR },     label: "noise cut chain (marching-squares contour)" },
-  { group: "Connections · role (stroke)", key: "role.merged",   swatch: { kind: "line",       color: MERGED_CUT_COLOR },    label: "merged-cut (boolean cut ∪/∖ noise)", defaultOff: true },
-  { group: "Connections · role (stroke)", key: "role.closure",  swatch: { kind: "line",       color: ROLE_COLOR.closure },  label: "closure (slot edge, filled)" },
-  { group: "Connections · role (stroke)", key: "role.internal", swatch: { kind: "line",       color: ROLE_COLOR.internal }, label: "internal (invisible)" },
-  { group: "Connections · role (stroke)", key: "kindOuterDash", swatch: { kind: "dashedLine", color: ROLE_COLOR.internal }, label: "dashed = kind: outer" },
-  { group: "Connections · markers", key: "decoration.chainOffset",   swatch: { kind: "offsetPair" }, label: "parallel offset = chainId hue" },
-  { group: "Connections · markers", key: "decoration.sideTick",      swatch: { kind: "sideTick" },   label: "tick → interiorSide (filled cell)" },
-  { group: "Connections · markers", key: "decoration.outwardNormal", swatch: { kind: "arrow" },      label: "outwardNormal (point → away)" },
-  { group: "Overlays", key: "overlay.cellTint",     swatch: { kind: "fill", color: "rgba(59, 158, 255, 0.22)" },        label: "cell tint (source pattern · filled)" },
-  { group: "Overlays", key: "overlay.noiseHoles",   swatch: { kind: "fill", color: NOISE_OVERLAY_COLORS.holes },        label: "noise hole — inside cut region (A · carves filled)" },
-  { group: "Overlays", key: "overlay.noisePatches", swatch: { kind: "fill", color: NOISE_OVERLAY_COLORS.patches },      label: "noise patch — outside cut region (B · adds to empty)" },
+  ...CORNER_TYPES_STRUCTURAL.map((t) => ({
+    group: "Points · cornerType", key: `corner.${t}`,
+    swatch: { kind: "ring", color: CORNER_COLOR[t] }, label: CORNER_LABEL[t], defaultOff: true,
+  })),
+
+  // Point markers — marker on canvas + copies the matching field on points.
+  { group: "Point markers", key: "marker.lockRing",        swatch: { kind: "lockRing" },     label: "locked point (inner ring) → lock" },
+  { group: "Point markers", key: "marker.endpointDot",     swatch: { kind: "endpointDot" },  label: "chain endpoint (cutDegree = 1) → chainEndpoint" },
+  { group: "Point markers", key: "marker.branchSquare",    swatch: { kind: "branchSquare" }, label: "chain branch (cutDegree ≥ 3)" },
+  { group: "Point markers", key: "decoration.outwardNormal", swatch: { kind: "arrow" },      label: "outwardNormal arrow → outwardNormal" },
+
+  // Overlays — region fills + copy the relevant params.
+  { group: "Overlays", key: "overlay.cellTint",     swatch: { kind: "fill", color: "rgba(59, 158, 255, 0.22)" },   label: "cell tint (source pattern · filled)" },
+  { group: "Overlays", key: "overlay.noiseHoles",   swatch: { kind: "fill", color: NOISE_OVERLAY_COLORS.holes },   label: "noise holes (A · carves filled) → noiseParams.A" },
+  { group: "Overlays", key: "overlay.noisePatches", swatch: { kind: "fill", color: NOISE_OVERLAY_COLORS.patches }, label: "noise patches (B · adds to empty) → noiseParams.B" },
+
+  // Data only — no visual; pure payload dumps. Default off (heavy / verbose).
+  { group: "Data (no visual)", key: "data.params",       swatch: { kind: "data" }, label: "global params (seed · globalCurve · noiseParams)", defaultOff: true },
+  { group: "Data (no visual)", key: "data.graph",        swatch: { kind: "data" }, label: "full graph dump", defaultOff: true },
+  { group: "Data (no visual)", key: "data.inflateDebug", swatch: { kind: "data" }, label: "inflate debug", defaultOff: true },
 ];
 
-let active        = loadOrDefault();
-let activeLayers  = loadLayersOrDefault();
-const listeners       = new Set();
-const layerListeners  = new Set();
+let activeAspects = loadOrDefault();
+const listeners   = new Set();
 let onCopy = null;
+// Per-group header checkbox + the aspect keys it governs (populated by
+// initDebugPanel) so a category toggle drives all its rows, and the header
+// reflects all / partial / none as checked / indeterminate / unchecked.
+const groupRecords     = new Map(); // group name -> { headerCb, keys: [] }
+const aspectCheckboxes = new Map(); // aspect key -> row checkbox
 
 function loadOrDefault() {
-  const saved = settings.get(FIELDS_KEY);
+  const saved = settings.get(ASPECTS_KEY);
   const out = {};
-  for (const kind of Object.keys(FIELDS)) {
-    out[kind] = {};
-    for (const f of FIELDS[kind]) {
-      out[kind][f] = saved?.[kind]?.[f] !== false;
-    }
+  for (const a of ASPECTS) {
+    const s = saved?.[a.key];
+    if (s == null) out[a.key] = !a.defaultOff;
+    else           out[a.key] = s !== false;
   }
   return out;
 }
 
-function loadLayersOrDefault() {
-  const saved = settings.get(LAYERS_KEY);
-  const out = {};
-  for (const l of LAYERS) {
-    const s = saved?.[l.key];
-    if (s == null) out[l.key] = !l.defaultOff;
-    else           out[l.key] = s !== false;
-  }
-  return out;
-}
-
-function persist()       { settings.set(FIELDS_KEY, active); }
-function persistLayers() { settings.set(LAYERS_KEY, activeLayers); }
-
-function notify()       { for (const fn of listeners)      fn(); }
-function notifyLayers() { for (const fn of layerListeners) fn(); }
+function persist() { settings.set(ASPECTS_KEY, activeAspects); }
+function notify()  { for (const fn of listeners) fn(); }
 
 export function initDebugPanel() {
   const root = document.getElementById("debug-body");
   if (!root) return;
+  root.className = "debug-layers";
 
-  for (const kind of Object.keys(FIELDS)) {
-    const grp = document.createElement("div");
-    grp.className = "debug-group";
-    const title = document.createElement("div");
-    title.className = "debug-group__title";
-    title.textContent = kind;
-    grp.appendChild(title);
-    for (const f of FIELDS[kind]) {
-      const lbl = document.createElement("label");
-      lbl.className = "debug-field";
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = active[kind][f];
-      input.dataset.kind  = kind;
-      input.dataset.field = f;
-      input.addEventListener("change", () => {
-        active[kind][f] = input.checked;
-        persist();
-        notify();
-      });
-      const span = document.createElement("span");
-      span.textContent = f;
-      lbl.appendChild(input);
-      lbl.appendChild(span);
-      grp.appendChild(lbl);
-    }
-    root.appendChild(grp);
-  }
-
-  document.getElementById("debug-all-on")?.addEventListener("click",  () => setAll(true));
-  document.getElementById("debug-all-off")?.addEventListener("click", () => setAll(false));
-  document.getElementById("debug-copy")?.addEventListener("click",    () => onCopy?.());
-
-  buildLayersDom();
-}
-
-function buildLayersDom() {
-  const root = document.getElementById("debug-layers-body");
-  if (!root) return;
   let currentGroup = null;
-  let groupEl = null;
-  for (const layer of LAYERS) {
-    if (layer.group !== currentGroup) {
-      currentGroup = layer.group;
-      const header = document.createElement("div");
+  let itemsEl = null;
+  let rec = null;
+  for (const a of ASPECTS) {
+    if (a.group !== currentGroup) {
+      currentGroup = a.group;
+      const groupName = a.group;
+      const header = document.createElement("label");
       header.className = "debug-layers__group";
-      header.textContent = layer.group;
+      const gcb = document.createElement("input");
+      gcb.type      = "checkbox";
+      gcb.className  = "debug-layers__group-toggle";
+      gcb.addEventListener("change", () => setGroup(groupName, gcb.checked));
+      const gtext = document.createElement("span");
+      gtext.textContent = groupName;
+      header.appendChild(gcb);
+      header.appendChild(gtext);
       root.appendChild(header);
-      groupEl = document.createElement("div");
-      groupEl.className = "debug-layers__items";
-      root.appendChild(groupEl);
+      itemsEl = document.createElement("div");
+      itemsEl.className = "debug-layers__items";
+      root.appendChild(itemsEl);
+      rec = { headerCb: gcb, keys: [] };
+      groupRecords.set(groupName, rec);
     }
+    rec.keys.push(a.key);
+
+    const groupName = a.group;
     const row = document.createElement("label");
     row.className = "debug-layer";
     const cb = document.createElement("input");
     cb.type    = "checkbox";
-    cb.checked = activeLayers[layer.key];
-    cb.dataset.layer = layer.key;
+    cb.checked = activeAspects[a.key];
+    cb.dataset.aspect = a.key;
     cb.addEventListener("change", () => {
-      activeLayers[layer.key] = cb.checked;
-      persistLayers();
-      notifyLayers();
+      activeAspects[a.key] = cb.checked;
+      persist();
+      syncGroup(groupName);
+      notify();
     });
-    const swatch = buildSwatch(layer.swatch);
-    const label = document.createElement("span");
-    label.className = "debug-layer__label";
-    label.textContent = layer.label;
+    aspectCheckboxes.set(a.key, cb);
+    const swatch = buildSwatch(a.swatch);
+    const label  = document.createElement("span");
+    label.className   = "debug-layer__label";
+    label.textContent = a.label;
     row.appendChild(cb);
     row.appendChild(swatch);
     row.appendChild(label);
-    groupEl.appendChild(row);
+    itemsEl.appendChild(row);
   }
 
-  document.getElementById("debug-layers-all-on")?.addEventListener("click",  () => setAllLayers(true));
-  document.getElementById("debug-layers-all-off")?.addEventListener("click", () => setAllLayers(false));
+  for (const g of groupRecords.keys()) syncGroup(g);
+
+  document.getElementById("debug-all-on")?.addEventListener("click",  () => setAll(true));
+  document.getElementById("debug-all-off")?.addEventListener("click", () => setAll(false));
+  document.getElementById("debug-copy")?.addEventListener("click",    () => onCopy?.());
 }
 
-function setAllLayers(value) {
-  for (const l of LAYERS) activeLayers[l.key] = value;
-  persistLayers();
-  document.querySelectorAll("#debug-layers-body input[type=checkbox]")
-    .forEach((cb) => { cb.checked = value; });
-  notifyLayers();
+// Category on/off: set every aspect in the group + sync its rows and header.
+function setGroup(group, value) {
+  const rec = groupRecords.get(group);
+  if (!rec) return;
+  for (const key of rec.keys) {
+    activeAspects[key] = value;
+    const cb = aspectCheckboxes.get(key);
+    if (cb) cb.checked = value;
+  }
+  rec.headerCb.checked       = value;
+  rec.headerCb.indeterminate = false;
+  persist();
+  notify();
+}
+
+// Reflect all / partial / none of a group on its header checkbox.
+function syncGroup(group) {
+  const rec = groupRecords.get(group);
+  if (!rec) return;
+  let on = 0;
+  for (const key of rec.keys) if (activeAspects[key]) on++;
+  rec.headerCb.checked       = on === rec.keys.length;
+  rec.headerCb.indeterminate = on > 0 && on < rec.keys.length;
+}
+
+function setAll(value) {
+  for (const a of ASPECTS) activeAspects[a.key] = value;
+  persist();
+  for (const cb of aspectCheckboxes.values()) cb.checked = value;
+  for (const g of groupRecords.keys()) syncGroup(g);
+  notify();
 }
 
 function buildSwatch(spec) {
@@ -212,12 +220,6 @@ function buildSwatch(spec) {
       el.style.height       = "2px";
       el.style.alignSelf    = "center";
       break;
-    case "dashedLine":
-      el.style.height       = "2px";
-      el.style.alignSelf    = "center";
-      el.style.backgroundImage =
-        `repeating-linear-gradient(to right, ${spec.color} 0 3px, transparent 3px 5px)`;
-      break;
     case "offsetPair":
       el.style.height       = "10px";
       el.style.alignSelf    = "center";
@@ -242,35 +244,15 @@ function buildSwatch(spec) {
       el.style.border       = "1px solid rgba(255,255,255,0.18)";
       el.style.boxSizing    = "border-box";
       break;
+    case "data":
+      el.style.border       = "1px dashed rgba(255,255,255,0.32)";
+      el.style.boxSizing    = "border-box";
+      break;
   }
   return el;
 }
 
-function setAll(value) {
-  for (const kind of Object.keys(FIELDS)) {
-    for (const f of FIELDS[kind]) active[kind][f] = value;
-  }
-  persist();
-  document.querySelectorAll("#debug-body input[type=checkbox]")
-    .forEach((cb) => { cb.checked = value; });
-  notify();
-}
-
-export function filterPayload(kind, full) {
-  const fields = active[kind] || {};
-  const out = {};
-  for (const f of Object.keys(full)) {
-    if (fields[f] !== false) out[f] = full[f];
-  }
-  return out;
-}
-
-export function onFieldsChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-
-export function setCopyHandler(fn) { onCopy = fn; }
-
-export function isLayerActive(key) { return activeLayers[key] !== false; }
-
-export function getActiveLayers() { return activeLayers; }
-
-export function onLayersChange(fn) { layerListeners.add(fn); return () => layerListeners.delete(fn); }
+export function isAspectActive(key)  { return activeAspects[key] !== false; }
+export function getActiveAspects()   { return activeAspects; }
+export function onAspectsChange(fn)  { listeners.add(fn); return () => listeners.delete(fn); }
+export function setCopyHandler(fn)   { onCopy = fn; }

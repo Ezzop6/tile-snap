@@ -107,7 +107,6 @@ function drawConnection(ctx, graph, conn, o, layerOn) {
   ctx.save();
   ctx.strokeStyle = roleStrokeColor(conn, o);
   ctx.lineWidth   = strokeWidthFor(conn, o);
-  if (conn.kind === "outer" && layerOn("kindOuterDash")) ctx.setLineDash(o.outerKindDash);
   strokeCurvePath(ctx, a.pos, b.pos, conn.curve);
   ctx.restore();
 

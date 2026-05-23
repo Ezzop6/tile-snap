@@ -1,4 +1,4 @@
-import { isLayerActive } from "../debugPanel.js";
+import { isAspectActive } from "../debugPanel.js";
 import { drawNoiseOverlay as drawNoiseOverlayShared } from "../render2/noiseOverlay.js";
 import { SLOT_SIZE } from "./constants.js";
 import { cellOn } from "../../core/cellValue.js";
@@ -27,6 +27,6 @@ export function drawSlotCellTints(ctx, slot, origin) {
 // Wires the shared overlay renderer to debug's per-side layer toggles.
 export function drawNoiseOverlay(ctx, slot, graph, origin, viewSize) {
   drawNoiseOverlayShared(ctx, slot, graph, origin, viewSize, (side) => {
-    return isLayerActive(side === "holes" ? "overlay.noiseHoles" : "overlay.noisePatches");
+    return isAspectActive(side === "holes" ? "overlay.noiseHoles" : "overlay.noisePatches");
   });
 }

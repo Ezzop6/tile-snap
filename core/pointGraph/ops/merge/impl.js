@@ -1,4 +1,5 @@
 import { arcControlPoint as arcControl } from "../../render.js";
+import { timed } from "../../../trace.js";
 
 const paper = window.paper;
 if (!paper) throw new Error("Paper.js not loaded — merge op requires it");
@@ -10,6 +11,9 @@ const HANDLE_EPS = 1e-6;
 export function mergeImpl(graph, opts = {}) {
   const side = opts.side ?? "off";
   if (!graph || side === "off") return graph;
+  // Sub-timings land in the trace overlay's "other" section (prefix `merge:`,
+  // not `curve:`) so they don't double-count the `curve:merge <side>` total.
+  const T = (step, fn) => timed(`merge:${side}/${step}`, fn);
 
   const noiseChains = collectNoiseChains(graph);
   if (!noiseChains.length) return graph;
@@ -18,17 +22,35 @@ export function mergeImpl(graph, opts = {}) {
   // merged-cut chains (e.g. layer A finished before us), build on top of
   // those instead of restarting from the raw cut+closure. This is what makes
   // A→B cumulative ((R \ A) ∪ B) instead of (R ∪ A ∪ B).
-  const curveLoops = walkCurveLoops(graph);
+  const curveLoops = T("walk", () => walkCurveLoops(graph));
   if (!curveLoops.length) return graph;
 
   scope.activate();
-  const curvePath = loopsToPaper(curveLoops, graph);
-  const noisePath = chainsToPaper(noiseChains, graph);
+  const curvePath = T("curvePaper", () => loopsToPaper(curveLoops, graph));
+  let noisePath   = T("noisePaper", () => chainsToPaper(noiseChains, graph));
   if (!curvePath || !noisePath) return graph;
 
-  const merged = side === "patches"
+  // Composition-level edge fade: pull noise back from the TRANSITION cut by
+  // fadePx. A band is built around the cut curve (Clipper open-path offset) and
+  // subtracted from the noise, so islands hugging the transition recede with a
+  // clean offset edge while deep interior / tile middle / slot-edge margin stay
+  // put. This lives here (not in the noise op) because the cut-mask geometry
+  // only exists at merge time. fadePx = 0 (default) skips it.
+  const fadePx = edgeFadePx(graph, opts.edgeFade);
+  if (fadePx > 0) {
+    const band = T("band", () => buildTransitionBand(graph, fadePx));
+    if (band) {
+      const reduced = T("fadeSub", () => noisePath.subtract(band));
+      band.remove();
+      noisePath.remove();
+      noisePath = reduced;
+    }
+  }
+  if (!noisePath) return graph;
+
+  const merged = T("boolean", () => side === "patches"
     ? curvePath.unite(noisePath)
-    : curvePath.subtract(noisePath);
+    : curvePath.subtract(noisePath));
   curvePath.remove();
   noisePath.remove();
   if (!merged) return graph;
@@ -36,10 +58,11 @@ export function mergeImpl(graph, opts = {}) {
   // Drop the previous merged-cut + the noise chains we just consumed so
   // a subsequent layer doesn't re-apply them and the result keeps only the
   // freshly merged geometry.
-  removePreviousMerged(graph);
-  removeConsumedNoiseChains(graph, noiseChains);
-
-  addMergedToGraph(graph, merged);
+  T("addGraph", () => {
+    removePreviousMerged(graph);
+    removeConsumedNoiseChains(graph, noiseChains);
+    addMergedToGraph(graph, merged);
+  });
   merged.remove();
   return graph;
 }
@@ -234,6 +257,79 @@ function appendCurveToPaper(path, a, b, curve, reversed = false) {
       path.lineTo(new paper.Point(b.x, b.y));
       break;
   }
+}
+
+const BAND_SCALE = 1000;
+const BAND_FLATNESS = 2;
+
+// fadePx for the edge fade = edgeFade fraction × one pattern-cell width
+// (slotSize / cols), matching the old per-cell calibration.
+function edgeFadePx(graph, edgeFade) {
+  if (!(edgeFade > 0)) return 0;
+  const cols = Math.max(1, graph.meta?.cols || 1);
+  return edgeFade * ((graph.meta?.slotSize || 0) / cols);
+}
+
+// Closed band of width fadePx around the TRANSITION cut curve only (role "cut",
+// excluding noise chains; closure / slot edges are role "closure" so already
+// out). Built with Clipper open-path offset (round caps/joins). Returns a Paper
+// path/CompoundPath in the active scope, or null when there's no transition
+// (e.g. a fully-interior tile) or Clipper is unavailable.
+function buildTransitionBand(graph, fadePx) {
+  if (typeof ClipperLib === "undefined" || !(fadePx > 0)) return null;
+  const co = new ClipperLib.ClipperOffset(2.0, 0.25);
+  const any = timed("band/addPaths", () => {
+    let added = false;
+    for (const conn of graph.connections.values()) {
+      if (conn.role !== "cut") continue;
+      if (typeof conn.chainId === "string" && conn.chainId.startsWith("noise_")) continue;
+      const a = graph.points.get(conn.from);
+      const b = graph.points.get(conn.to);
+      if (!a || !b) continue;
+      let pts;
+      if (!conn.curve || !conn.curve.type || conn.curve.type === "line") {
+        pts = [
+          { X: Math.round(a.pos.x * BAND_SCALE), Y: Math.round(a.pos.y * BAND_SCALE) },
+          { X: Math.round(b.pos.x * BAND_SCALE), Y: Math.round(b.pos.y * BAND_SCALE) },
+        ];
+      } else {
+        // Flatten curved connections so the band follows the real cut shape.
+        const seg = new paper.Path({ insert: false });
+        seg.moveTo(a.pos.x, a.pos.y);
+        appendCurveToPaper(seg, a.pos, b.pos, conn.curve, false);
+        seg.flatten(BAND_FLATNESS);
+        pts = seg.segments.map((s) => ({
+          X: Math.round(s.point.x * BAND_SCALE),
+          Y: Math.round(s.point.y * BAND_SCALE),
+        }));
+        seg.remove();
+      }
+      if (pts.length < 2) continue;
+      co.AddPath(pts, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etOpenRound);
+      added = true;
+    }
+    return added;
+  });
+  if (!any) return null;
+
+  const solution = new ClipperLib.Paths();
+  timed("band/execute", () => co.Execute(solution, fadePx * BAND_SCALE));
+  if (!solution || !solution.length) return null;
+
+  const paths = timed("band/toPaper", () => {
+    const out = [];
+    for (const poly of solution) {
+      if (!poly || poly.length < 3) continue;
+      const p = new paper.Path({ insert: false });
+      p.moveTo(poly[0].X / BAND_SCALE, poly[0].Y / BAND_SCALE);
+      for (let i = 1; i < poly.length; i++) p.lineTo(poly[i].X / BAND_SCALE, poly[i].Y / BAND_SCALE);
+      p.closed = true;
+      out.push(p);
+    }
+    return out;
+  });
+  if (!paths.length) return null;
+  return paths.length === 1 ? paths[0] : new paper.CompoundPath({ children: paths, insert: false });
 }
 
 function addMergedToGraph(graph, mergedPaper) {

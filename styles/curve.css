@@ -195,47 +195,6 @@
   accent-color: var(--color-accent);
 }
 
-.debug-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-}
-
-.debug-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.debug-group__title {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding-bottom: 2px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.debug-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-  cursor: pointer;
-  user-select: none;
-}
-
-.debug-field input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: var(--color-accent);
-}
-
 .debug-layers {
   display: flex;
   flex-direction: column;
@@ -246,6 +205,9 @@
 }
 
 .debug-layers__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -253,6 +215,16 @@
   padding-top: 4px;
   padding-bottom: 2px;
   border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.debug-layers__group-toggle {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-accent);
 }
 
 .debug-layers__items {

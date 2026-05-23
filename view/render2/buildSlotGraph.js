@@ -305,12 +305,12 @@ function applyOps(graph, slot, opts = {}) {
     if (np.A?.enabled) {
       const aParams = { ...np.A, side: "holes" };
       timed("curve:noise A", () => noise(graph, { params: aParams, seed, slotCol, slotRow }));
-      timed("curve:merge A", () => merge(graph, { side: "holes" }));
+      timed("curve:merge A", () => merge(graph, { side: "holes", edgeFade: np.A.edgeFade }));
     }
     if (np.B?.enabled) {
       const bParams = { ...np.B, side: "patches" };
       timed("curve:noise B", () => noise(graph, { params: bParams, seed: seed + 9973, slotCol, slotRow }));
-      timed("curve:merge B", () => merge(graph, { side: "patches" }));
+      timed("curve:merge B", () => merge(graph, { side: "patches", edgeFade: np.B.edgeFade }));
     }
   }
 }

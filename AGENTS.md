@@ -622,18 +622,26 @@ tileset_generator/
 │   │   ├── constants.js       — SLOT_SIZE/SLOT_SCALE/SLOT_GAP/STAGE_PADDING/SUPERSAMPLE.
 │   │   ├── overlays.js        — per-slot noise overlay rendering (shared module also reused by
 │   │   │                        view/mapView noise overlay tinting).
-│   │   ├── selection.js       — selected-slot frame + last-click cache for the Copy payload button.
-│   │   └── click.js           — click hit-testing → console + clipboard payload filtering via
-│   │                            debugPanel.filterPayload(kind, full).
-│   ├── debugPanel.js          — Two right-panel sections (data-mode="debug"):
-│   │                            (1) "fields" — per-kind checkbox lists controlling which entity
-│   │                            props land in console + clipboard. Persisted via
-│   │                            settings.<debugFields>.
-│   │                            (2) "layers" — per-drawable checkbox list (cornerTypes, point
-│   │                            markers, connection roles, decorations, overlays incl. role.merged).
-│   │                            Persisted via settings.<debugLayers>.
-│   │                            Exposes: FIELDS, LAYERS, NOISE_OVERLAY_COLORS, filterPayload,
-│   │                            setCopyHandler, isLayerActive, getActiveLayers, onLayersChange.
+│   │   ├── selection.js       — point / connection inspection highlights (slot frame = shared
+│   │   │                        screen-space overlay; last-click payload cached on dbgState).
+│   │   └── click.js           — click hit-testing (point > connection > slot) → clipboard payload.
+│   │                            Payload driven by the SAME aspect toggles that draw: click a
+│   │                            point/connection → copies just that element (optional fields gated by
+│   │                            their marker/decoration aspect); click empty slot → copies a slot
+│   │                            snapshot of every enabled aspect (= exactly what's drawn there).
+│   ├── debugPanel.js          — ONE right-panel "Debug" section (data-mode="debug"): a single
+│   │                            `ASPECTS` registry where each aspect BOTH draws on the canvas (if it
+│   │                            has a visual) AND contributes its data to the clipboard payload — so
+│   │                            the user's visual == the data handed off. Drawing (drawGraph +
+│   │                            overlays) and the clipboard builder (debug/click.js) read the same
+│   │                            isAspectActive(key). Groups: Connections (role.*) · Connection
+│   │                            decorations (chainOffset/sideTick) · Points·cornerType (corner.*) ·
+│   │                            Point markers (lock/endpoint/branch/outwardNormal) · Overlays
+│   │                            (cellTint/noiseHoles/noisePatches) · Data (no visual: params/graph/
+│   │                            inflateDebug). Each group header has an on/off toggle (checked /
+│   │                            indeterminate / unchecked = all / some / none). Single
+│   │                            settings.<debugAspects>. Exposes: ASPECTS, NOISE_OVERLAY_COLORS,
+│   │                            isAspectActive, getActiveAspects, onAspectsChange, setCopyHandler.
 │   ├── cellShapes/            — strategy modules per template cellShape. Contract:
 │   │   │                        `defaultValue / fullValue / slotDims / hitTest / nextValue /
 │   │   │                        applyVisual / valueEquals / renderParams(host, draft, ctx) /

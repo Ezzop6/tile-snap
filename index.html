@@ -41,6 +41,7 @@
       <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Cap the heavy ops (noise + wave) at ~5x/sec during slider drag (default). Toggle off for live updates — smoother visual at the cost of drag responsiveness.">Throttle rendering</button>
       <button class="topbar__toggle" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (centred on screen).">⏱</button>
       <button class="topbar__toggle" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
+      <button class="topbar__toggle" id="trace-copy" type="button" title="Copy the last trace timings to clipboard.">⧉</button>
     </div>
   </header>
 
@@ -432,25 +433,14 @@
 
       <section class="panel-section panel-section--fixed" data-mode="debug">
         <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="debug-body">
-          <h2 class="panel-section__title">Debug · fields</h2>
+          <h2 class="panel-section__title">Debug</h2>
           <div class="panel-section__actions">
-            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-on"  type="button" title="Check all">✓</button>
-            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-off" type="button" title="Uncheck all">∅</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-on"  type="button" title="Enable all (draw + copy)">✓</button>
+            <button class="curve-panel__btn curve-panel__btn--header" id="debug-all-off" type="button" title="Disable all">∅</button>
             <button class="curve-panel__btn curve-panel__btn--header" id="debug-copy"    type="button" title="Copy current selection payload to clipboard">⧉</button>
           </div>
         </header>
-        <div class="debug-panel" id="debug-body"></div>
-      </section>
-
-      <section class="panel-section panel-section--fixed" data-mode="debug">
-        <header class="panel-section__header panel-section__header--collapsible" data-collapse-target="debug-layers-body">
-          <h2 class="panel-section__title">Debug · layers</h2>
-          <div class="panel-section__actions">
-            <button class="curve-panel__btn curve-panel__btn--header" id="debug-layers-all-on"  type="button" title="Show all">✓</button>
-            <button class="curve-panel__btn curve-panel__btn--header" id="debug-layers-all-off" type="button" title="Hide all">∅</button>
-          </div>
-        </header>
-        <div class="debug-layers" id="debug-layers-body"></div>
+        <div class="debug-layers" id="debug-body"></div>
       </section>
 
       <!-- Larger preview of the currently selected slot. Respects the

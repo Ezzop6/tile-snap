@@ -1,5 +1,4 @@
 import { scaleToPeriodPx } from "./noise_params.js";
-import { minDistanceToSegments } from "./geometry.js";
 
 const SAMPLE_PX = 2;
 
@@ -117,10 +116,6 @@ export function buildNoiseMask(slotCol, slotRow, origin, size, params, seed) {
   const cols = Math.ceil(size.w / SAMPLE_PX) + 1;
   const rows = Math.ceil(size.h / SAMPLE_PX) + 1;
   const data = new Uint8Array(cols * rows);
-  // Raw noise sample per cell; edge-aware fade in noiseImpl re-thresholds
-  // using `values * edgeWeight > threshold`. -2 marks "killed at slot edge"
-  // so re-threshold can't accidentally reactivate those cells.
-  const values = new Float32Array(cols * rows);
 
   for (let r = 0; r < rows; r++) {
     const py = r * SAMPLE_PX;
@@ -132,43 +127,18 @@ export function buildNoiseMask(slotCol, slotRow, origin, size, params, seed) {
 
       const dx = Math.min(fx, 1 - fx);
       const dy = Math.min(fy, 1 - fy);
-      if (Math.min(dx, dy) <= HARD_EDGE_FRAC) { data[idx] = 0; values[idx] = -2; continue; }
+      // Hard zero within a fraction of the slot edge so neighbouring tiles never
+      // show clipped half-islands. This margin is for cross-tile continuity and
+      // is intentionally separate from the (composition-level) edge fade.
+      if (Math.min(dx, dy) <= HARD_EDGE_FRAC) { data[idx] = 0; continue; }
 
       const tx = (slotCol + fx) * REFERENCE_SLOT_SIZE;
       const ty = (slotRow + fy) * REFERENCE_SLOT_SIZE;
       const n  = sampler(simplex, tx * freq, ty * freq);
-      values[idx] = n;
       data[idx]   = n > threshold ? 1 : 0;
     }
   }
 
-  return { cols, rows, data, values, threshold, cell: SAMPLE_PX, origin };
+  return { cols, rows, data, cell: SAMPLE_PX, origin };
 }
 
-// Edge-aware fade: noise weakens near the boundary by raising the
-// effective threshold. At distance >= fadePx the cell uses the normal
-// density threshold; at the edge (d=0) the threshold is bumped all the
-// way to +1 (= "only the strongest noise survives"). Density-independent
-// — the multiplicative `v*w` version only nudged thresholds for low
-// density, this version moves the visible edge for any density.
-// segments: flat [ax,ay,bx,by,...] in same coords as mask cells.
-export function applyEdgeFade(mask, segments, fadePx) {
-  if (!fadePx || fadePx <= 0 || !segments?.length) return;
-  const { cols, rows, data, values, threshold, cell, origin } = mask;
-  if (!values) return;
-  const bumpRange = 1 - threshold;
-  for (let r = 0; r < rows; r++) {
-    const py = origin.y + r * cell + cell * 0.5;
-    for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c;
-      if (!data[idx]) continue;
-      const v = values[idx];
-      if (v < -1) continue;
-      const px = origin.x + c * cell + cell * 0.5;
-      const d = minDistanceToSegments(segments, px, py);
-      const w = Math.min(1, d / fadePx);
-      const effective = threshold + (1 - w) * bumpRange;
-      if (v <= effective) data[idx] = 0;
-    }
-  }
-}

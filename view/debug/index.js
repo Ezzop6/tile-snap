@@ -6,7 +6,7 @@ import { createStage } from "../stage.js";
 import { sharedTransform } from "../sharedTransform.js";
 import { createSelectionOverlay, slotClientRect } from "../selectionFrame.js";
 import {
-  isLayerActive, getActiveLayers, onLayersChange, setCopyHandler,
+  isAspectActive, getActiveAspects, onAspectsChange, setCopyHandler,
 } from "../debugPanel.js";
 import { dbgState } from "./state.js";
 import {
@@ -68,7 +68,7 @@ export function initDebugMode() {
   state.addEventListener("noise:changed",                  repaint);
   state.addEventListener("seed:changed",                   repaint);
   state.addEventListener("project:loaded",                 clearAndRepaint);
-  onLayersChange(repaint);
+  onAspectsChange(repaint);
 
   setCopyHandler(copyLastReport);
 }
@@ -100,11 +100,11 @@ function render() {
   ctx.clearRect(0, 0, widthPx, heightPx);
   dbgState.stage?.setContentSize(widthPx, heightPx);
 
-  const layers = getActiveLayers();
+  const layers = getActiveAspects();
   const slotGraphs = new Map();
   for (const slot of t.slots) {
     const o = slotOrigin(slot);
-    if (isLayerActive("overlay.cellTint")) drawSlotCellTints(ctx, slot, o);
+    if (isAspectActive("overlay.cellTint")) drawSlotCellTints(ctx, slot, o);
     const graph = buildSlotGraph(slot);
     drawNoiseOverlay(ctx, slot, graph, o, SLOT_SIZE);
     ctx.save();
