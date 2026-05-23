@@ -693,3 +693,14 @@ body.map-hidden .map-overlay { display: none !important; }
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='4'><rect width='16' height='1' y='1' fill='%23555'/><rect width='16' height='1' y='3' fill='%23555'/></svg>");
 }
 
+/* Slot selection frame — shared screen-space overlay (view/selectionFrame.js)
+   used by preview / debug / export. Fixed 2px border = one thin crisp line of
+   identical thickness everywhere, independent of texture resolution + zoom. */
+.slot-selection-frame {
+  position: absolute;
+  pointer-events: none;
+  border: 2px solid var(--color-warn, #ffcc00);
+  box-sizing: border-box;
+  z-index: 5;
+}
+

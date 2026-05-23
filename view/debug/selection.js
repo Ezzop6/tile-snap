@@ -1,5 +1,5 @@
 import { arcControlPoint } from "../../core/pointGraph/render.js";
-import { SLOT_SIZE, SLOT_SCALE, HIGHLIGHT_COLOR, slotOrigin } from "./constants.js";
+import { SLOT_SCALE, HIGHLIGHT_COLOR, slotOrigin } from "./constants.js";
 
 export function drawSelectionOverlay(ctx, template, slotGraphs, selected) {
   if (!selected) return;
@@ -15,17 +15,12 @@ export function drawSelectionOverlay(ctx, template, slotGraphs, selected) {
   ctx.lineJoin    = "round";
 
   switch (selected.kind) {
-    case "slot":       drawSlotHighlight(ctx, slot); break;
+    // "slot" frame is drawn by the shared screen-space overlay (debug/index.js),
+    // so it matches preview + export exactly. Only inspection markers stay here.
     case "point":      drawPointHighlight(ctx, graph, slot, selected); break;
     case "connection": drawConnHighlight(ctx, graph, slot, selected); break;
   }
   ctx.restore();
-}
-
-function drawSlotHighlight(ctx, slot) {
-  const o = slotOrigin(slot);
-  ctx.lineWidth = 2;
-  ctx.strokeRect(o.x + 1, o.y + 1, SLOT_SIZE - 2, SLOT_SIZE - 2);
 }
 
 function drawPointHighlight(ctx, graph, slot, selected) {

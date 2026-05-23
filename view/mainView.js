@@ -13,14 +13,17 @@ import {
   drawSlotComposite,
   drawOutline,
 } from "./render2/index.js";
+import { createSelectionOverlay, slotClientRect } from "./selectionFrame.js";
 
 const SLOT_GAP = 0;
-const SELECTION_COLOR = "#ffcc00";
 
 let stageEl = null;
 let canvas = null;
 let stage = null;
+let selectionOverlay = null;
 let currentSlotSize = 64;
+let contentW = 0;
+let contentH = 0;
 
 export function initMainView() {
   stageEl = document.getElementById("main-stage");
@@ -41,6 +44,21 @@ export function initMainView() {
     isActive:     () => getMode() === "preview",
   });
   stage.setContent(canvas);
+
+  // Selection frame = screen-space overlay (shared with debug + export), so it
+  // stays one thin crisp line regardless of the texture resolution this canvas
+  // is sized at. Repositions itself on pan/zoom via stage.onTransform.
+  selectionOverlay = createSelectionOverlay(stageEl, stage);
+  selectionOverlay.setTracker(() => {
+    const t = state.template;
+    const idx = state.selectedSlotIndex;
+    if (!t || idx == null) return null;
+    const slot = t.slots.find((s) => s.index === idx);
+    if (!slot) return null;
+    const step = currentSlotSize + SLOT_GAP;
+    return slotClientRect(canvas, contentW, contentH,
+      slot.col * step, slot.row * step, currentSlotSize, currentSlotSize);
+  });
 
   canvas.addEventListener("click", onClick);
 
@@ -89,6 +107,8 @@ function refresh() {
   const cols = t.cols, rows = t.rows;
   const widthPx  = cols * currentSlotSize + (cols - 1) * SLOT_GAP;
   const heightPx = rows * currentSlotSize + (rows - 1) * SLOT_GAP;
+  contentW = widthPx;
+  contentH = heightPx;
   canvas.width  = widthPx;
   canvas.height = heightPx;
   canvas.style.width  = widthPx  + "px";
@@ -98,7 +118,6 @@ function refresh() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, widthPx, heightPx);
 
-  const selectedIdx = state.selectedSlotIndex;
   for (const slot of t.slots) {
     const origin = {
       x: slot.col * (currentSlotSize + SLOT_GAP),
@@ -107,18 +126,10 @@ function refresh() {
     const graph = buildSlotGraph(slot);
     drawSlotComposite(ctx, slot, graph, origin, currentSlotSize, { mode });
     drawOutline(ctx, graph, origin, currentSlotSize, { snap });
-    if (slot.index === selectedIdx) drawSelectionFrame(ctx, origin, currentSlotSize);
   }
 
   stage.setContentSize(widthPx, heightPx);
-}
-
-function drawSelectionFrame(ctx, origin, size) {
-  ctx.save();
-  ctx.strokeStyle = SELECTION_COLOR;
-  ctx.lineWidth   = 2;
-  ctx.strokeRect(origin.x + 1, origin.y + 1, size - 2, size - 2);
-  ctx.restore();
+  selectionOverlay?.refresh();
 }
 
 export function resetMainView() {

@@ -25,11 +25,13 @@ export function createStage(stageEl, opts = {}) {
   let panStartX = 0, panStartY = 0;
   let panStartOffsetX = 0, panStartOffsetY = 0;
   let noiseIdleTimer = null;
+  const transformSubs = [];
 
   function applyTransform() {
     if (!content) return;
     const s = fitScale * zoom;
     content.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${s})`;
+    for (const cb of transformSubs) cb();
   }
 
   function computeFitScale() {
@@ -145,6 +147,16 @@ export function createStage(stageEl, opts = {}) {
     },
     refit,
     displayScale: () => fitScale * zoom,
+    // Fires on every transform change (pan / zoom / fit / reset) so screen-
+    // space overlays (e.g. the selection frame) can reposition. Returns an
+    // unsubscribe fn.
+    onTransform(cb) {
+      transformSubs.push(cb);
+      return () => {
+        const i = transformSubs.indexOf(cb);
+        if (i >= 0) transformSubs.splice(i, 1);
+      };
+    },
     isPanning: () => panning,
     clientToContent(clientX, clientY) {
       if (!content) return null;

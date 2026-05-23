@@ -3,6 +3,7 @@ import { onModeChange, getMode } from "../modeTabs.js";
 import { drawGraph } from "../render2/drawGraph.js";
 import { buildSlotGraph } from "../render2/buildSlotGraph.js";
 import { createStage } from "../stage.js";
+import { createSelectionOverlay, slotClientRect } from "../selectionFrame.js";
 import {
   isLayerActive, getActiveLayers, onLayersChange, setCopyHandler,
 } from "../debugPanel.js";
@@ -14,6 +15,15 @@ import {
 import { drawSlotCellTints, drawNoiseOverlay } from "./overlays.js";
 import { drawSelectionOverlay } from "./selection.js";
 import { onClick as handleClick, copyLastReport } from "./click.js";
+
+let selectionOverlay = null;
+
+function debugContentSize(t) {
+  return {
+    w: t.cols * SLOT_SIZE + (t.cols - 1) * SLOT_GAP + STAGE_PADDING * 2,
+    h: t.rows * SLOT_SIZE + (t.rows - 1) * SLOT_GAP + STAGE_PADDING * 2,
+  };
+}
 
 export function initDebugMode() {
   dbgState.stageEl  = document.getElementById("debug-stage");
@@ -28,6 +38,21 @@ export function initDebugMode() {
     isActive,
   });
   dbgState.stage.setContent(dbgState.canvasEl);
+
+  // Slot-selection frame uses the shared screen-space overlay (same as preview
+  // + export); point / connection highlights stay on the canvas (inspection
+  // markers). Tracker only returns a rect for a "slot" selection.
+  selectionOverlay = createSelectionOverlay(dbgState.stageEl, dbgState.stage);
+  selectionOverlay.setTracker(() => {
+    const sel = dbgState.selected;
+    if (!sel || sel.kind !== "slot") return null;
+    const t = state.template;
+    const slot = t?.slots.find((s) => s.index === sel.slotIndex);
+    if (!slot) return null;
+    const { w, h } = debugContentSize(t);
+    const o = slotOrigin(slot);
+    return slotClientRect(dbgState.canvasEl, w, h, o.x, o.y, SLOT_SIZE, SLOT_SIZE);
+  });
 
   onModeChange((mode) => { if (mode === "debug") render(); });
   const repaint        = () => { if (isActive()) render(); };
@@ -92,4 +117,5 @@ function render() {
   }
 
   drawSelectionOverlay(ctx, t, slotGraphs, dbgState.selected);
+  selectionOverlay?.refresh();
 }
