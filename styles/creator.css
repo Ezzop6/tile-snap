@@ -481,3 +481,38 @@
   background: #e74c3c;
   color: #fff;
 }
+
+/* Pattern size picker (2×2 / 3×3) — segmented two-position control.
+   Native radios hidden; the checked option's wrapping label gets the accent,
+   mirroring .render-mode in the topbar. */
+.creator-pattern {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+}
+
+.creator-pattern__opt {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.creator-pattern__opt + .creator-pattern__opt {
+  border-left: 1px solid var(--color-border);
+}
+
+.creator-pattern__opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.creator-pattern__opt:has(input:checked) {
+  background: var(--color-accent);
+  color: var(--color-text-strong);
+}

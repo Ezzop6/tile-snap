@@ -1,5 +1,5 @@
 import { state } from "../../controller/state.js";
-import { defaultTemplate, deleteUserTemplate } from "../../templates/index.js";
+import { defaultTemplate, deleteUserTemplate, findFreeTemplateName } from "../../templates/index.js";
 import { projects as projectStorage } from "../../controller/storage.js";
 import { showToast } from "../toast.js";
 import { confirmDestructive } from "../dialog.js";
@@ -84,7 +84,11 @@ export async function onNameChange() {
   }
   const cleaned = (refs.nameInput.value || "").trim() || "untitled";
   if (cleaned === state.template.name) return;
-  state.template.name = cleaned;
+  // Ids are opaque now, so the display name is the only human-facing key —
+  // keep it unique. A collision with another template gets a " (N)" increment
+  // (excludeId so renaming to the template's own name is a no-op above).
+  const unique = findFreeTemplateName(cleaned, { excludeId: state.template.id });
+  state.template.name = unique;
   state.markTemplateDirty();
   syncToolbarInputs();
   sync.suppressNextRebuild = true;

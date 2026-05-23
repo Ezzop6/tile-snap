@@ -130,12 +130,10 @@ export function saveUserTemplate(template) {
     terrainMode,
     slots,
   };
-  const existing = templateStorage.load(template.id);
-  if (existing) {
-    templateStorage.save(template.id, data, template.name);
-  } else {
-    templateStorage.save(template.id, data, template.name);
-  }
+  // Opaque id: present + in storage = update in place (saving edits to a
+  // loaded template); present + new = create. With name-independent ids a new
+  // template's id can never accidentally equal another's, so save is safe.
+  templateStorage.save(template.id, data, template.name);
   templateRegistry.dispatchEvent(
     new CustomEvent("changed", { detail: template.id }),
   );
@@ -192,39 +190,47 @@ function slugify(s) {
     || "untitled";
 }
 
-// Public version of slug rules — single source of truth for "what id will
-// a template get if I name it X". Callers outside this module that need to
-// persist + retrieve by id (Duplicate, Import) use this.
+// Slug of a name — used ONLY for human-friendly export filenames now.
+// Storage ids are opaque (newTemplateId), never derived from the name, so a
+// rename can never collide with or overwrite another template.
 export function templateIdFromName(name) {
   return slugify(name);
 }
 
-// Returns baseName if its slug is free across BOTH builtin + user storage,
-// otherwise `${baseName} (N)` with smallest free N≥2. Replaces the legacy
-// findFreeCopyName which only checked builtin and silently overwrote user
-// entries. Used for Clone (builtin → editable copy), Import (collision-safe
-// id at import time), and Duplicate (explicit user copy).
-export function findFreeTemplateName(baseName) {
+// Opaque, name-independent id for a new template (clone / import / duplicate).
+// Same scheme as projects (genId) — see controller/storage.js#templates.newId.
+export function newTemplateId() {
+  return templateStorage.newId();
+}
+
+// Returns baseName if no other template (builtin or user) uses that DISPLAY
+// name, otherwise `${baseName} (N)` with smallest free N≥2. Names are the only
+// thing users compare templates by (ids are opaque + name-independent), so we
+// keep them unique. opts.excludeId skips one stored template (rename of
+// itself); opts.alsoTaken reserves extra names (a duplicate must differ from
+// its source even when the source isn't persisted yet).
+export function findFreeTemplateName(baseName, { excludeId, alsoTaken } = {}) {
   const base = String(baseName ?? "untitled").trim() || "untitled";
-  const userIds = new Set(templateStorage.list().map((m) => m.id));
-  const isTaken = (name) => {
-    const id = slugify(name);
-    return isBuiltinTemplate(id) || userIds.has(id);
-  };
-  if (!isTaken(base)) return base;
+  const taken = new Set(alsoTaken || []);
+  for (const t of BUILTIN) taken.add(t.name);
+  for (const m of templateStorage.list()) {
+    if (excludeId && m.id === excludeId) continue;
+    taken.add(m.name);
+  }
+  if (!taken.has(base)) return base;
   let n = 2;
-  while (isTaken(`${base} (${n})`)) n++;
+  while (taken.has(`${base} (${n})`)) n++;
   return `${base} (${n})`;
 }
 
 // In-memory clone of a built-in template marked as 'unsaved' user template.
-// New id derived from copy name. Storage write happens on explicit Save.
+// Opaque id (name-independent); storage write happens on explicit Save.
 export function cloneTemplateAsUser(template) {
   if (!template) return null;
   const slots = (template.slots || []).map((s) =>
     cloneSlot(s, { withIndex: true, cols: template.cols }));
   const name = findFreeTemplateName(template.name || "template");
-  const id   = slugify(name);
+  const id   = templateStorage.newId();
   return {
     id,
     name,

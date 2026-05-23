@@ -6,6 +6,7 @@ import {
   cloneSlot,
   findFreeTemplateName,
   templateIdFromName,
+  newTemplateId,
 } from "../../templates/index.js";
 import { showToast } from "../toast.js";
 import { confirmDestructive } from "../dialog.js";
@@ -55,7 +56,7 @@ export function exportJSON() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href = url;
-  a.download = `${out.id}.template.json`;
+  a.download = `${templateIdFromName(out.name)}.template.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -86,10 +87,10 @@ export async function importTemplateFromObject(obj) {
   }
   // Build a fresh user-storage template object; same shape as cloneTemplateAsUser
   // but seeded from the imported data. Source stays "unsaved" until user saves.
-  // Name passes through findFreeTemplateName so the derived id can't collide
-  // with a builtin OR an existing user template — no silent overwrite on save.
+  // Opaque id (name-independent) → save can never overwrite another template;
+  // name passes through findFreeTemplateName to stay unique among existing ones.
   const name = findFreeTemplateName(obj.name || "imported template");
-  const id   = slugify(name);
+  const id   = newTemplateId();
   const imported = {
     id, name,
     cols: obj.cols, rows: obj.rows,
@@ -138,8 +139,10 @@ export function duplicateTemplate() {
   const t = state.template;
   if (!t) return;
   const baseName = t.name || "template";
-  const newName  = findFreeTemplateName(baseName);
-  const newId    = templateIdFromName(newName);
+  // alsoTaken reserves the source name so a duplicate always gets " (N)" even
+  // when the source is an unsaved copy not yet in storage.
+  const newName  = findFreeTemplateName(baseName, { alsoTaken: [baseName] });
+  const newId    = newTemplateId();
   const snap     = snapshotTemplate(t);
   const data     = { ...snap, id: newId, name: newName };
   try {
@@ -184,13 +187,4 @@ export async function saveToLibrary() {
     console.error("[templateCreator] save failed:", err);
     showToast(`Save failed: ${err.message || err}`, { kind: "error", duration: 4000 });
   }
-}
-
-function slugify(s) {
-  return String(s || "untitled")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    || "untitled";
 }

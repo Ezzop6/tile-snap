@@ -24,6 +24,7 @@ import {
   isBuiltinTemplate,
   getTemplateById,
   saveUserTemplate,
+  findFreeTemplateName,
 } from "../templates/index.js";
 
 // Collects unique inputIds referenced by pool refs in a project blob.
@@ -172,7 +173,10 @@ export async function hydrateBundle(obj) {
     if (t.id && t.data && !isBuiltinTemplate(t.id)) {
       const existing = templateStorage.load(t.id);
       if (!existing) {
-        templateStorage.save(t.id, t.data, t.name || t.id);
+        // Opaque id is kept (obj.template references it); only the display
+        // name is bumped if it collides, so template names stay unique.
+        const name = findFreeTemplateName(t.name || t.id);
+        templateStorage.save(t.id, t.data, name);
       }
       // If existing, user's version wins; obj.template stays pointing at the
       // existing id and that's the right behaviour.

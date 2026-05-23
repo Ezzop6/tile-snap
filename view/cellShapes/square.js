@@ -1,7 +1,10 @@
 import { DEBUG } from "../../config.js";
 
-export const MIN_PATTERN = 2;
-export const MAX_PATTERN = 7;
+// Square patterns are limited to the two sizes Godot terrain export maps to
+// peering bits: 2×2 (dual-grid corners) and 3×3 (single-grid 8-direction).
+// See view/export/peeringBits.js. Larger N rendered fine but exported without
+// peering bits, so it's not exposed. Extend this array if peeringBits grows.
+export const PATTERN_SIZES = [2, 3];
 
 // Even parity = dual-grid convention; odd = classic single-grid.
 export function defaultConnectedSaddle(rows, cols) {
@@ -105,11 +108,13 @@ export const SQUARE = {
 
   renderParams(host, draft, ctx) {
     host.innerHTML = `
-      <label class="curve-panel__field" title="Pattern grid resolution per tile (NxN). Even N defaults to dual-grid; odd to single. Independent of saddle mode.">
+      <div class="curve-panel__field" title="Pattern grid per tile. 2×2 = dual-grid (corner matching); 3×3 = single-grid (8-direction). These are the two sizes Godot terrain export maps to peering bits. Even N defaults to dual, odd to single.">
         <span class="curve-panel__label">Pattern</span>
-        <input class="curve-panel__value curve-panel__value--editable" id="creator-pattern-input" type="number"
-               min="${MIN_PATTERN}" max="${MAX_PATTERN}" step="1">
-      </label>
+        <span class="creator-pattern" id="creator-pattern">
+          ${PATTERN_SIZES.map((n) => `
+          <label class="creator-pattern__opt"><input type="radio" name="creator-pattern" value="${n}">${n}×${n}</label>`).join("")}
+        </span>
+      </div>
       <label class="curve-panel__field" title="Pipeline kind: single = slot edge IS tile boundary (wang/blob). Dual = slot edges overlap with neighbours via shifted half-cell rendering. Drives lock rules + slot-edge semantics, orthogonal to Connected saddle.">
         <span class="curve-panel__label">Grid kind</span>
         <select class="curve-panel__input curve-panel__input--narrow" id="creator-grid-kind">
@@ -142,34 +147,41 @@ export const SQUARE = {
     // (builtin → copy). Re-read via ctx.getTemplate() before any mutation.
     const live = () => ctx.getTemplate();
 
-    const input = host.querySelector("#creator-pattern-input");
-    input.value = String(curN());
-    input.addEventListener("change", async () => {
-      const raw = parseInt(input.value, 10);
-      const n   = Math.max(MIN_PATTERN, Math.min(MAX_PATTERN, isFinite(raw) ? raw : MIN_PATTERN));
-      if (n === curN()) return;
-      // ctx.confirm runs ensureEditable + asks; ctx.ensureEditable for the
-      // no-content branch where no destructive warning is needed.
-      if (ctx.hasContent()) {
-        if (!(await ctx.confirm("Changing Pattern resets every slot. Continue?"))) {
-          input.value = String(curN());
+    const patternRadios = host.querySelectorAll('input[name="creator-pattern"]');
+    // Reflect current pattern; if a (legacy) template uses an unlisted size,
+    // no radio matches — picking one normalises it to 2×2 / 3×3.
+    const syncPatternUI = () => {
+      const n = curN();
+      for (const r of patternRadios) r.checked = parseInt(r.value, 10) === n;
+    };
+    syncPatternUI();
+    for (const r of patternRadios) {
+      r.addEventListener("change", async () => {
+        const n = parseInt(r.value, 10);
+        if (n === curN()) return;
+        // ctx.confirm runs ensureEditable + asks; ctx.ensureEditable for the
+        // no-content branch where no destructive warning is needed.
+        if (ctx.hasContent()) {
+          if (!(await ctx.confirm("Changing Pattern resets every slot. Continue?"))) {
+            syncPatternUI();
+            return;
+          }
+        } else if (!(await ctx.ensureEditable())) {
+          syncPatternUI();
           return;
         }
-      } else if (!(await ctx.ensureEditable())) {
-        input.value = String(curN());
-        return;
-      }
-      const t = live();
-      t.gridKind        = defaultGridKind(n, n);
-      t.connectedSaddle = defaultConnectedSaddle(n, n);
-      for (const slot of t.slots) {
-        slot.array = ctx.makeEmptyArray(n, n, 0);
-      }
-      kindSel.value  = t.gridKind;
-      saddle.checked = t.connectedSaddle;
-      syncOffsetEnabled();
-      ctx.onChange();
-    });
+        const t = live();
+        t.gridKind        = defaultGridKind(n, n);
+        t.connectedSaddle = defaultConnectedSaddle(n, n);
+        for (const slot of t.slots) {
+          slot.array = ctx.makeEmptyArray(n, n, 0);
+        }
+        kindSel.value  = t.gridKind;
+        saddle.checked = t.connectedSaddle;
+        syncOffsetEnabled();
+        ctx.onChange();
+      });
+    }
 
     const kindSel = host.querySelector("#creator-grid-kind");
     kindSel.value = draft.gridKind === "dual" ? "dual" : "single";

@@ -188,6 +188,13 @@ export const templates = {
     return id;
   },
 
+  // Opaque id for an in-memory template not yet persisted (clone / import /
+  // duplicate). Save happens later via save(); the id is generated up front
+  // so state.template has a stable, name-independent key from the start.
+  newId() {
+    return genId("tmpl");
+  },
+
   delete(id) {
     localStorage.removeItem(KEY_TEMPLATE(id));
     const ids = readManifest(KEY_TEMPLATE_MANIFEST).filter((x) => x !== id);
