@@ -31,7 +31,7 @@
       <button class="mode-tab" id="mode-template" type="button" role="tab">+ Template</button>
       <button class="mode-tab" id="mode-texture"  type="button" role="tab" title="Hide left panel + middle workspace; the right Texture · global panel fills the screen.">Texture</button>
       <button class="mode-tab" id="mode-bundle"   type="button" role="tab" title="Combine multiple projects into a single Godot TileSet with shared terrain_set.">Bundle</button>
-      <button class="mode-tab" id="mode-debug"    type="button" role="tab" title="PointGraph abstraction debug view (new pipeline, no textures).">Debug</button>
+      <button class="mode-tab debug-only" id="mode-debug"    type="button" role="tab" title="PointGraph abstraction debug view (new pipeline, no textures).">Debug</button>
     </div>
 
     <!-- Right: noise throttle toggle + project seed shortcut. -->
@@ -39,10 +39,9 @@
       <input class="topbar__seed-input" id="project-seed" type="number" min="0" max="99999" step="1" value="42" title="Project seed (drives noise + variants)">
       <button class="topbar__toggle" id="project-seed-random" type="button" title="Randomize project seed">🎲</button>
       <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Cap the heavy ops (noise + wave) at ~5x/sec during slider drag (default). Toggle off for live updates — smoother visual at the cost of drag responsiveness.">Throttle rendering</button>
-      <button class="topbar__toggle" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (centred on screen).">⏱</button>
-      <button class="topbar__toggle" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
-      <button class="topbar__toggle" id="trace-reset" type="button" title="Reset the averaged timings (re-baseline after a code change) without stopping the recording.">↺</button>
-      <button class="topbar__toggle" id="trace-copy" type="button" title="Copy the last trace timings to clipboard.">⧉</button>
+      <button class="topbar__toggle debug-only" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (top-left).">⏱</button>
+      <button class="topbar__toggle debug-only" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
+      <button class="topbar__toggle debug-only" id="trace-copy" type="button" title="Copy the last trace timings to clipboard.">⧉</button>
     </div>
   </header>
 
@@ -617,9 +616,9 @@
     </div>
   </div>
 
-  <!-- Pipeline trace overlay: centred on screen, position: fixed so it
-       sits above any mode's content. Toggled by tracePanel.js. -->
-  <aside class="trace-overlay" id="trace-overlay" hidden></aside>
+  <!-- Pipeline trace overlay: top-left, position: fixed so it sits above any
+       mode's content. Toggled by tracePanel.js; DEBUG-only via .debug-only. -->
+  <aside class="trace-overlay debug-only" id="trace-overlay" hidden></aside>
 
   <!-- Generic modal — populated/opened by JS. Hidden by default; clicking
        the backdrop or pressing Esc closes it without committing. -->

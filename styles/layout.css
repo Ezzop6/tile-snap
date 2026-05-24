@@ -566,9 +566,8 @@ body.map-hidden .map-overlay { display: none !important; }
    in the DOM, high z-index so it floats above modal/menu chrome too. */
 .trace-overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: calc(var(--topbar-height) + var(--space-2));
+  left: var(--space-2);
   width: 320px;
   max-height: 70vh;
   background: var(--color-bg-panel);

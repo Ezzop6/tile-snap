@@ -2,7 +2,6 @@ import { state } from "../controller/state.js";
 import {
   setTracingEnabled,
   getTimingStats,
-  resetTraceAverages,
   onTimingsChange,
 } from "../core/trace.js";
 import { showToast } from "./toast.js";
@@ -18,14 +17,12 @@ let overlay = null;
 let visibleBtn = null;
 let recordBtn = null;
 let copyBtn = null;
-let resetBtn = null;
 
 export function initTracePanel() {
   overlay    = document.getElementById("trace-overlay");
   visibleBtn = document.getElementById("trace-toggle");
   recordBtn  = document.getElementById("trace-record");
   copyBtn    = document.getElementById("trace-copy");
-  resetBtn   = document.getElementById("trace-reset");
   if (!overlay && !visibleBtn && !recordBtn) return;
 
   setTracingEnabled(state.traceRecording);
@@ -40,10 +37,6 @@ export function initTracePanel() {
     state.setTraceRecording(!state.traceRecording);
   });
   copyBtn?.addEventListener("click", copyTrace);
-  resetBtn?.addEventListener("click", () => {
-    resetTraceAverages();
-    showToast("Trace averages reset", { kind: "info" });
-  });
 
   state.addEventListener("trace-visible:changed", () => {
     syncButtons();

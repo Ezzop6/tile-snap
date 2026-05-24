@@ -27,6 +27,13 @@ button {
   font-family: inherit;
 }
 
+/* Debug-only UI (tracing controls + overlay, Debug mode tab). Visible only when
+   main.js adds `debug-on` to <body> (= config.js DEBUG). !important so it wins
+   over component display rules (mode tabs, topbar toggles). */
+body:not(.debug-on) .debug-only {
+  display: none !important;
+}
+
 h1, h2, h3, h4 {
   margin: 0;
   font-weight: 600;

@@ -63,9 +63,10 @@ const DEFAULT_TILE_SIZE = 64;
 
 import { DEBUG } from "./config.js";
 
-if (!DEBUG) {
-  document.getElementById("mode-debug")?.style.setProperty("display", "none");
-}
+// All debug-only UI (Debug mode tab + tracing controls + trace overlay) is
+// gated behind DEBUG via the `debug-on` body class + the `.debug-only` CSS
+// utility. Any future debug element just gets `class="… debug-only"`.
+if (DEBUG) document.body.classList.add("debug-on");
 
 const Split = window.Split;
 
@@ -172,7 +173,7 @@ bindSettingsListeners();
 // projectBar first: it owns render-mode plumbing (body class + radio sync) that other views call into.
 initProjectBar();
 initSeedPanel();
-initTracePanel();
+if (DEBUG) initTracePanel(); // tracing fully inert when DEBUG is off
 initSourcePanel();
 initCurvePanel();
 initTexOpsPanel();

@@ -38,13 +38,6 @@ export function setTracingEnabled(v) {
 
 export function isTracingEnabled() { return enabled; }
 
-// Drop accumulated stats without touching the recording state — re-baseline
-// after a code OR settings change.
-export function resetTraceAverages() {
-  stats = Object.create(null);
-  notify();
-}
-
 export function mark(name, dt) {
   if (!enabled) return;
   let s = stats[name];
