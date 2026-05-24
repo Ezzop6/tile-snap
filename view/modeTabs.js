@@ -16,14 +16,15 @@ const MODES = {
 let currentMode = "preview";
 const subscribers = new Set();
 
-// Resolved at init time (not module load) — main.js sets display:none on
-// hidden buttons (e.g. map when !DEBUG) AFTER imports finish, so an earlier
-// read would miss the gating and land the user in an invisible tab.
+// Resolved at init time (not module load) — the Debug tab is hidden when
+// !DEBUG (via the .debug-only class + body.debug-on, set AFTER imports finish),
+// so an earlier read would miss the gating and land the user in an invisible
+// tab. Computed style (not inline style.display) because the gating is in CSS.
 function loadInitialMode() {
   const saved = settings.get(SETTING_KEY);
   if (typeof saved !== "string" || !(saved in MODES)) return "preview";
   const btn = document.getElementById(MODES[saved].btnId);
-  if (btn && btn.style.display === "none") return "preview";
+  if (btn && getComputedStyle(btn).display === "none") return "preview";
   return saved;
 }
 

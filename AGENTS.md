@@ -1,4 +1,4 @@
-# AGENTS.md — Tileset Generator
+# AGENTS.md — TileSnap
 
 Vlastní pracovní poznámky pro Claude — navigace + rozpracované pochopení projektu.
 (Původní `tileset-generator-spec.md`, `info.md` i `AGENTS_LOG.md` byly smazány;

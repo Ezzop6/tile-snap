@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release build for the Tileset Generator.
+# Release build for TileSnap.
 #
 # OPT-IN deployment step only — the dev workflow stays build-free (open
 # index.html directly, no compilation to run or iterate). This script bundles
@@ -9,8 +9,13 @@
 # Tooling (node + npm/npx required) is fetched on demand via npx and cached
 # in ~/.npm — nothing is installed into the repo, no package.json.
 #
-# Usage:  OBFUSCATE=none|light|heavy [OUTDIR=dist] ./build.sh
+# Usage:  OBFUSCATE=none|light|heavy [DEBUG_BUILD=false] [OUTDIR=dist] ./build.sh
 # Output: dist/index.html + dist/app.<hash>.js + dist/app.<hash>.css
+#
+# DEBUG_BUILD bakes config.js#DEBUG (via esbuild --define). Default false = a
+# shipped build with debug UI off; it can still be flipped on at runtime with
+# localStorage["tilesnap.debug"]="1" + reload (survives obfuscation). Set
+# DEBUG_BUILD=true to bake a debug-on build on purpose.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,6 +23,11 @@ cd "$ROOT"
 
 OBFUSCATE="${OBFUSCATE:-none}"
 OUTDIR="${OUTDIR:-dist}"
+DEBUG_BUILD="${DEBUG_BUILD:-false}"
+case "$DEBUG_BUILD" in
+  true|false) ;;
+  *) echo "✗ DEBUG_BUILD must be 'true' or 'false' (got '$DEBUG_BUILD')" >&2; exit 1 ;;
+esac
 ESBUILD="esbuild@0.25.12"
 OBFUSCATOR="javascript-obfuscator@4.2.2"
 HTMLMIN="html-minifier-terser@7.2.0"
@@ -26,7 +36,7 @@ TMP="$(mktemp -d)"
 ENTRY_CSS="$ROOT/.build-entry.css"
 trap 'rm -rf "$TMP" "$ENTRY_CSS"' EXIT
 
-echo "▶ build: OBFUSCATE=$OBFUSCATE  OUTDIR=$OUTDIR"
+echo "▶ build: OBFUSCATE=$OBFUSCATE  DEBUG_BUILD=$DEBUG_BUILD  OUTDIR=$OUTDIR"
 
 # --- 1. Bundle + minify JS. Format stays ESM because main.js uses top-level
 #        await (state.loadInputsLibrary); index.html keeps <script type=module>.
@@ -37,6 +47,7 @@ npx --yes "$ESBUILD" main.js \
   --target=es2022 \
   --minify \
   --legal-comments=none \
+  "--define:__TILESNAP_DEBUG__=$DEBUG_BUILD" \
   --outfile="$TMP/app.js"
 
 # --- 2. Optional obfuscation pass over the bundled JS.

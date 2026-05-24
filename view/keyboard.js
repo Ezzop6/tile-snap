@@ -1,9 +1,10 @@
 // Single source of truth for keyboard shortcuts. Modules register combos here
 // instead of attaching their own document-level keydown listeners.
 //
-// Combo format: "Ctrl+S", "Ctrl+Shift+S", "Alt+Enter". Order: Ctrl, Alt, Shift,
-// Meta then key. Letter keys are uppercased; non-letter keys taken from
-// event.key as-is ("Enter", "Escape", "ArrowUp", "/").
+// Combo format: "Ctrl+S", "Ctrl+Shift+S", "Alt+Enter", "Space". Order: Ctrl,
+// Alt, Shift, Meta then key. Letter keys are uppercased; the spacebar is
+// "Space" (event.key " " is normalized); other non-letter keys taken from
+// event.key as-is ("Enter", "Escape", "ArrowUp", "/", "~").
 
 const handlers = new Map(); // combo → { fn, description }
 
@@ -46,7 +47,7 @@ function eventToCombo(e) {
   if (e.altKey)   parts.push("Alt");
   if (e.shiftKey) parts.push("Shift");
   if (e.metaKey)  parts.push("Meta");
-  const k = e.key;
+  const k = e.key === " " ? "Space" : e.key;
   parts.push(k.length === 1 ? k.toUpperCase() : k);
   return parts.join("+");
 }
@@ -71,6 +72,7 @@ document.addEventListener("keydown", (e) => {
   const combo = eventToCombo(e);
   const entry = handlers.get(combo);
   if (!entry) return;
-  e.preventDefault();
-  entry.fn(e);
+  // A handler may return false to signal "not handled here" (e.g. a mode-gated
+  // shortcut in the wrong mode) so the browser default is left intact.
+  if (entry.fn(e) !== false) e.preventDefault();
 });

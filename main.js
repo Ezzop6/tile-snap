@@ -44,7 +44,8 @@ import {
   importTemplateFromObject,
 } from "./view/templateCreator/index.js";
 import { initExportPanel, resetExportView } from "./view/exportPanel.js";
-import { initModeTabs, onModeChange } from "./view/modeTabs.js";
+import { initModeTabs, onModeChange, setMode, getMode } from "./view/modeTabs.js";
+import { sharedTransform } from "./view/sharedTransform.js";
 import { initDebugMode, resetDebugView } from "./view/debug/index.js";
 import { initDebugPanel } from "./view/debugPanel.js";
 import { initBundleMode } from "./view/bundleMode.js";
@@ -233,6 +234,53 @@ registerShortcut("Ctrl+N", () => requestNew(),
   { description: "New project (prompts to save if dirty)" });
 registerShortcut("Ctrl+O", () => openProjectModal(),
   { description: "Open projects" });
+
+// Mode switch: number keys → the always-on modes; Shift+~ → Debug (only wired
+// when DEBUG, so it can't land in an invisible tab on a release build).
+registerShortcut("1", () => setMode("preview"),  { description: "Mode: Preview" });
+registerShortcut("2", () => setMode("export"),   { description: "Mode: Export" });
+registerShortcut("3", () => setMode("template"), { description: "Mode: Template" });
+registerShortcut("4", () => setMode("texture"),  { description: "Mode: Texture" });
+registerShortcut("5", () => setMode("bundle"),   { description: "Mode: Bundle" });
+if (DEBUG) {
+  registerShortcut("Shift+~", () => setMode("debug"), { description: "Mode: Debug" });
+}
+
+// View navigation — Preview / Export / Debug share one pan/zoom transform
+// (sharedTransform). Space resets it; WASD pans by a fixed fraction of the
+// visible stage (zoom-independent so a press always moves the same proportion).
+// Other modes (Template / Texture / Bundle) have no pan stage → no-op there.
+const PAN_FRACTION = 0.15;
+const PAN_STAGE_ID = { preview: "main-stage", export: "export-stage", debug: "debug-stage" };
+
+function activePanStage() {
+  const id = PAN_STAGE_ID[getMode()];
+  return id ? document.getElementById(id) : null;
+}
+
+// dirX/dirY are camera directions: +x reveals content to the left, +y reveals
+// content above (so the content translates the opposite way on screen).
+// Returns false (= "not handled, let the browser default through") when the
+// current mode has no pan stage, so the keys keep their native behaviour there.
+function panView(dirX, dirY) {
+  const el = activePanStage();
+  if (!el) return false;
+  sharedTransform.state.offsetX += dirX * el.clientWidth  * PAN_FRACTION;
+  sharedTransform.state.offsetY += dirY * el.clientHeight * PAN_FRACTION;
+  sharedTransform.notify();
+}
+
+registerShortcut("Space", () => {
+  if (!activePanStage()) return false; // not a pan mode → let Space do its default
+  sharedTransform.state.zoom = 1;
+  sharedTransform.state.offsetX = 0;
+  sharedTransform.state.offsetY = 0;
+  sharedTransform.notify();
+}, { description: "Reset pan + zoom (Preview/Export/Debug)" });
+registerShortcut("W", () => panView(0, +1), { description: "Pan view up" });
+registerShortcut("S", () => panView(0, -1), { description: "Pan view down" });
+registerShortcut("A", () => panView(+1, 0), { description: "Pan view left" });
+registerShortcut("D", () => panView(-1, 0), { description: "Pan view right" });
 
 // Browsers don't reliably set application/json on drop, so extension is the primary signal.
 // Sequential await per file: hash dedup must see freshly added inputs from the same batch.
