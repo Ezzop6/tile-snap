@@ -1,7 +1,11 @@
 import { scaleToPeriodPx } from "./noise_params.js";
-import { minDistanceToSegments } from "./geometry.js";
+import { anySegmentWithin } from "./geometry.js";
 
-const SAMPLE_PX = 2;
+// Mask sample resolution (px). One knob driving both heavy noise costs: smaller
+// = finer island edges but more applyCutFade cells (∝ 1/SAMPLE_PX²) and more
+// merge-boolean vertices (∝ 1/SAMPLE_PX). 3 trades slightly coarser edges for
+// ~2.25× fewer fade cells + ~1.5× fewer merge vertices vs the original 2.
+const SAMPLE_PX = 3;
 
 // Forced 0 within this fraction of the slot edge so neighbouring tiles never
 // show clipped half-islands.
@@ -158,7 +162,7 @@ export function applyCutFade(mask, segments, fadePx) {
       const idx = r * cols + c;
       if (!data[idx]) continue;
       const px = origin.x + c * cell + cell * 0.5;
-      if (minDistanceToSegments(segments, px, py) < fadePx) data[idx] = 0;
+      if (anySegmentWithin(segments, px, py, fadePx)) data[idx] = 0;
     }
   }
 }

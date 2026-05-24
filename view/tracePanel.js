@@ -1,7 +1,8 @@
 import { state } from "../controller/state.js";
 import {
   setTracingEnabled,
-  getLastTimings,
+  getTimingStats,
+  resetTraceAverages,
   onTimingsChange,
 } from "../core/trace.js";
 import { showToast } from "./toast.js";
@@ -17,12 +18,14 @@ let overlay = null;
 let visibleBtn = null;
 let recordBtn = null;
 let copyBtn = null;
+let resetBtn = null;
 
 export function initTracePanel() {
   overlay    = document.getElementById("trace-overlay");
   visibleBtn = document.getElementById("trace-toggle");
   recordBtn  = document.getElementById("trace-record");
   copyBtn    = document.getElementById("trace-copy");
+  resetBtn   = document.getElementById("trace-reset");
   if (!overlay && !visibleBtn && !recordBtn) return;
 
   setTracingEnabled(state.traceRecording);
@@ -37,6 +40,10 @@ export function initTracePanel() {
     state.setTraceRecording(!state.traceRecording);
   });
   copyBtn?.addEventListener("click", copyTrace);
+  resetBtn?.addEventListener("click", () => {
+    resetTraceAverages();
+    showToast("Trace averages reset", { kind: "info" });
+  });
 
   state.addEventListener("trace-visible:changed", () => {
     syncButtons();
@@ -65,7 +72,7 @@ function syncOverlay() {
 function render() {
   if (!overlay || overlay.hidden) return;
   const recording = state.traceRecording;
-  const t = getLastTimings();
+  const t = getTimingStats();
   const keys = Object.keys(t);
   if (!recording && keys.length === 0) {
     overlay.innerHTML = `<div class="trace-overlay__title">Pipeline trace</div>
@@ -81,20 +88,28 @@ function render() {
   const tex   = keys.filter((k) => k.startsWith("tex:")).sort();
   const other = keys.filter((k) => !k.startsWith("curve:") && !k.startsWith("tex:")).sort();
 
-  const fmt = (k) => `<div class="trace-overlay__row"><span>${shortLabel(k)}</span><span>${t[k].toFixed(2)}ms</span></div>`;
-  const total = (arr) => arr.reduce((a, k) => a + t[k], 0);
+  // avg over many calls = the stable comparison number; call count secondary.
+  const fmt = (k) => {
+    const s = t[k];
+    return `<div class="trace-overlay__row"><span>${shortLabel(k)}</span>` +
+      `<span>${s.avg.toFixed(3)}ms<span class="trace-overlay__sub"> avg · n${s.count}</span></span></div>`;
+  };
+  const totalAvg = (arr) => arr.reduce((a, k) => a + t[k].avg, 0);
+  const totalRow = (arr) => `<div class="trace-overlay__total"><span>Σ per call</span>` +
+    `<span>${totalAvg(arr).toFixed(3)}ms<span class="trace-overlay__sub"> avg</span></span></div>`;
 
   const parts = [];
-  parts.push(`<div class="trace-overlay__title">Pipeline trace${recording ? "" : " · paused"}</div>`);
+  parts.push(`<div class="trace-overlay__title">Pipeline trace${recording ? "" : " · paused"}` +
+    ` <span class="trace-overlay__sub">per-call avg ms (n=calls)</span></div>`);
   if (curve.length) {
     parts.push(`<div class="trace-overlay__group">Curve / PointGraph</div>`);
     for (const k of curve) parts.push(fmt(k));
-    parts.push(`<div class="trace-overlay__total"><span>total</span><span>${total(curve).toFixed(2)}ms</span></div>`);
+    parts.push(totalRow(curve));
   }
   if (tex.length) {
     parts.push(`<div class="trace-overlay__group">Texture ops</div>`);
     for (const k of tex) parts.push(fmt(k));
-    parts.push(`<div class="trace-overlay__total"><span>total</span><span>${total(tex).toFixed(2)}ms</span></div>`);
+    parts.push(totalRow(tex));
   }
   if (other.length) {
     for (const k of other) parts.push(fmt(k));
@@ -103,14 +118,17 @@ function render() {
 }
 
 function shortLabel(key) {
-  const i = key.indexOf(":");
-  return i >= 0 ? key.slice(i + 1) : key;
+  // Strip only the group prefix (curve: / tex:) — the group header already
+  // names the category. Other namespaces (merge:, noiseFade:) stay intact so
+  // "noiseFade:holes" isn't shown as a bare "holes" next to "merge:holes/...".
+  if (key.startsWith("curve:") || key.startsWith("tex:")) return key.slice(key.indexOf(":") + 1);
+  return key;
 }
 
 // Copy the last-burst timings to clipboard as readable text (same grouping as
 // the overlay) so they can be pasted straight into a bug report.
 function copyTrace() {
-  const t = getLastTimings();
+  const t = getTimingStats();
   if (!Object.keys(t).length) {
     showToast("No trace data yet — record (⏺) + interact first", { kind: "info" });
     return;
@@ -125,18 +143,23 @@ function formatTimings(t) {
   const curve = keys.filter((k) => k.startsWith("curve:")).sort();
   const tex   = keys.filter((k) => k.startsWith("tex:")).sort();
   const other = keys.filter((k) => !k.startsWith("curve:") && !k.startsWith("tex:")).sort();
-  const row = (k) => `  ${shortLabel(k).padEnd(24)} ${t[k].toFixed(2).padStart(9)}ms`;
-  const sum = (arr) => arr.reduce((a, k) => a + t[k], 0);
-  const lines = ["Pipeline trace"];
+  const row = (k) => {
+    const s = t[k];
+    return `  ${shortLabel(k).padEnd(24)} ${s.avg.toFixed(3).padStart(9)}ms avg  (n=${s.count})`;
+  };
+  const sumAvg = (arr) => arr.reduce((a, k) => a + t[k].avg, 0);
+  const totalLine = (label, arr) =>
+    `  ${label.padEnd(24)} ${sumAvg(arr).toFixed(3).padStart(9)}ms avg`;
+  const lines = ["Pipeline trace (per-call avg ms)"];
   if (curve.length) {
     lines.push("Curve / PointGraph");
     for (const k of curve) lines.push(row(k));
-    lines.push(`  ${"total".padEnd(24)} ${sum(curve).toFixed(2).padStart(9)}ms`);
+    lines.push(totalLine("Σ per call", curve));
   }
   if (tex.length) {
     lines.push("Texture ops");
     for (const k of tex) lines.push(row(k));
-    lines.push(`  ${"total".padEnd(24)} ${sum(tex).toFixed(2).padStart(9)}ms`);
+    lines.push(totalLine("Σ per call", tex));
   }
   if (other.length) {
     lines.push("Other");

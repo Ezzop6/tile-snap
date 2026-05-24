@@ -569,7 +569,7 @@ body.map-hidden .map-overlay { display: none !important; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 280px;
+  width: 320px;
   max-height: 70vh;
   background: var(--color-bg-panel);
   border: 2px solid var(--color-accent);
@@ -610,6 +610,11 @@ body.map-hidden .map-overlay { display: none !important; }
 .trace-overlay__empty {
   color: var(--color-text-muted);
   font-style: italic;
+}
+.trace-overlay__sub {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-size: 0.85em;
 }
 
 .map-stage {
