@@ -12,6 +12,8 @@ import {
 import {
   getLastProjectId,
   setLastProjectId,
+  isDemoSeeded,
+  markDemoSeeded,
 } from "../controller/settings.js";
 import {
   initProjectModal,
@@ -77,6 +79,8 @@ export function applyRenderModeClass(el) {
   el.classList.add("render-pixel");
 }
 
+const DEMO_PROJECT_URL = "demo.tilesetproj.json";
+
 export async function autoLoad() {
   const id = getLastProjectId();
   if (id && projectStorage.meta(id)) {
@@ -85,7 +89,34 @@ export async function autoLoad() {
   // Covers users who cleared the lastProjectId setting but still have projects in storage.
   const list = projectStorage.list();
   if (list.length > 0) return loadProjectById(list[0].id);
+  // First run / empty storage: seed the bundled demo once so the tool is usable
+  // without hunting for assets. markDemoSeeded() guards against resurrecting it
+  // after the user deletes the demo.
+  if (!isDemoSeeded()) return seedDemoProject();
   return false;
+}
+
+// Loads the bundled demo (a standard exported .tilesetproj.json) through the
+// same import path as the Import JSON button. Only reached when storage is
+// empty AND the demo was never seeded. markDemoSeeded() runs AFTER a successful
+// import: once the demo exists it's a normal saved project (so list != empty
+// stops re-seeding anyway); the flag's real job is to NOT resurrect it after
+// the user deletes it. Marking after success also self-heals a deploy where the
+// file is briefly missing. Needs HTTP (the app already requires it for ES
+// modules), so this never runs on a file:// open.
+async function seedDemoProject() {
+  try {
+    const res = await fetch(DEMO_PROJECT_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const obj = await res.json();
+    await importProjectAsNewEntry(obj, { toast: false });
+    markDemoSeeded();
+    showToast("Loaded a demo project to get you started — delete it anytime.", { kind: "info" });
+    return true;
+  } catch (err) {
+    console.warn("[demo] seed skipped:", err);
+    return false;
+  }
 }
 
 export function getActiveProjectId() {
@@ -313,7 +344,7 @@ export async function loadProjectFromObject(obj) {
 // the active one immediately. Bundle is hydrated globally before persistence
 // — localStorage stays slim since images already live in content-addressed
 // `images` storage after hydrate.
-export async function importProjectAsNewEntry(obj) {
+export async function importProjectAsNewEntry(obj, { toast = true } = {}) {
   const cleaned = await hydrateBundle(obj);
   const baseName = (cleaned?.projectName && String(cleaned.projectName).trim()) || "untitled";
   const name = findFreeProjectName(baseName);
@@ -324,6 +355,6 @@ export async function importProjectAsNewEntry(obj) {
   setLastProjectId(id);
   state.dispatchEvent(new CustomEvent("project:saved", { detail: id }));
   refreshProjectModal();
-  showToast(`Imported as new project "${name}"`, { kind: "success" });
+  if (toast) showToast(`Imported as new project "${name}"`, { kind: "success" });
   return id;
 }

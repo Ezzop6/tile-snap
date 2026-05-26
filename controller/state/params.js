@@ -12,9 +12,10 @@ export function initParamsState(state) {
   state._globalTextureOps = { A: buildOpDefaults(), B: buildOpDefaults() };
   state._mapVisible = true;
   state._seed = DEFAULT_SEED;
-  // Global throttle for the heavy ops (noise + wave). ON (default) caps each
-  // op at ~5x/sec during rapid event bursts so dragging stays responsive.
-  // OFF runs both ops every refresh (= live but heavier drag).
+  // Global throttle for the heavy ops (noise + wave). ON (default) SKIPS both
+  // while a slider/handle is being dragged (interactionGate), then re-renders
+  // full quality on pointerup, so dragging stays responsive. OFF runs both ops
+  // every refresh (= live during drag but heavier/choppier).
   state._renderThrottle = true;
   // Pipeline trace: two independent toggles.
   //   _traceVisible   = overlay shown / hidden (centred on screen)

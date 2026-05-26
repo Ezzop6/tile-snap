@@ -147,7 +147,17 @@ npx --yes "$HTMLMIN" \
   -o "$OUTDIR/index.html" \
   "$TMP/index.html"
 
+# --- 5b. Ship the first-run demo project. projectBar fetches it on first run
+#         (empty storage) and imports it; it must sit next to index.html.
+if [ -f demo.tilesetproj.json ]; then
+  echo "  · copying demo project"
+  cp demo.tilesetproj.json "$OUTDIR/"
+fi
+
 # --- 6. Report.
 echo "✔ done → $OUTDIR/"
 printf '  %-22s %s\n' "$JS_NAME"  "$(du -h "$OUTDIR/$JS_NAME"  | cut -f1)"
 printf '  %-22s %s\n' "$CSS_NAME" "$(du -h "$OUTDIR/$CSS_NAME" | cut -f1)"
+if [ -f "$OUTDIR/demo.tilesetproj.json" ]; then
+  printf '  %-22s %s\n' "demo.tilesetproj.json" "$(du -h "$OUTDIR/demo.tilesetproj.json" | cut -f1)"
+fi

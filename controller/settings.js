@@ -10,6 +10,7 @@ const KEYS = {
   bundleAtlasPath:  "bundleAtlasPath",
   exportShowGroups: "exportShowGroups",
   lastProjectId:    "lastProjectId",
+  demoSeeded:       "demoSeeded",
 };
 
 const LEGACY_KEYS = ["renderFreeze", "noiseThrottle", "waveThrottle"];
@@ -75,4 +76,14 @@ export function setLastProjectId(id) {
   if (next == null) settings.remove(KEYS.lastProjectId);
   else              settings.set(KEYS.lastProjectId, next);
   state.dispatchEvent(new CustomEvent("active-project:changed", { detail: next }));
+}
+
+// First-run demo seeding guard: once the demo project has been auto-loaded, we
+// never auto-seed again (so deleting the demo sticks). Cross-session.
+export function isDemoSeeded() {
+  return settings.get(KEYS.demoSeeded) === true;
+}
+
+export function markDemoSeeded() {
+  settings.set(KEYS.demoSeeded, true);
 }

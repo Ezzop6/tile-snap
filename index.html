@@ -38,7 +38,7 @@
     <div class="topbar__group">
       <input class="topbar__seed-input" id="project-seed" type="number" min="0" max="99999" step="1" value="42" title="Project seed (drives noise + variants)">
       <button class="topbar__toggle" id="project-seed-random" type="button" title="Randomize project seed">🎲</button>
-      <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Cap the heavy ops (noise + wave) at ~5x/sec during slider drag (default). Toggle off for live updates — smoother visual at the cost of drag responsiveness.">Throttle rendering</button>
+      <button id="render-throttle-toggle" type="button" aria-pressed="true" title="Skip noise + wave while dragging for a snappy drag; full quality on release. Off = live but choppier.">Fast drag</button>
       <button class="topbar__toggle debug-only" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (top-left).">⏱</button>
       <button class="topbar__toggle debug-only" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
       <button class="topbar__toggle debug-only" id="trace-copy" type="button" title="Copy the last trace timings to clipboard.">⧉</button>

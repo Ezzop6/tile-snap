@@ -1191,7 +1191,7 @@ plynulý, s nimi se zasekává.
   / `opts.includeNoise` (bool) tohle bypassují — PNG/Godot export je nastaví na
   `true` pro full-quality output.
 - **`state._renderThrottle`** (default `true`) — jeden user-facing toggle v topbaru
-  ("Throttle rendering"). Při přepnutí `main.js` force-fire `noise:changed`, aby
+  ("Fast drag"). Při přepnutí `main.js` force-fire `noise:changed`, aby
   views okamžitě překreslily efekt změny. Persistuje jako `settings.renderThrottle`.
 
 > **Historie:** dřívější `drawGate.js` / `noiseGate.js` / `waveGate.js` (časovaná
