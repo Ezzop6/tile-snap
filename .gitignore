@@ -5,3 +5,7 @@ TODO.md
 # release build output + transient build artifact
 dist/
 .build-entry.css
+
+# electron desktop wrapper
+node_modules/
+release/

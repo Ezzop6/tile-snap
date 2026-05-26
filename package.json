@@ -1,0 +1,39 @@
+{
+  "name": "tilesnap-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Electron desktop wrapper for TileSnap.",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.itch.ezzop6.tilesnap",
+    "productName": "TileSnap",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron-main.cjs",
+      "src/**/*",
+      "LICENSE",
+      "THIRD-PARTY-LICENSES.md"
+    ],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Graphics"
+    },
+    "win": {
+      "target": ["portable"]
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.graphics"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+TileSnap — Proprietary License
+Copyright © 2026 ezzop6 (https://github.com/ezzop6). All rights reserved.
+
+1. Ownership
+   TileSnap (the "Software"), including its source code, design, and assets,
+   is proprietary and remains the exclusive property of the copyright holder.
+   The Software is licensed, not sold.
+
+2. Permitted use
+   You may use the distributed Software to create tilesets and other artwork.
+   Output you produce with the Software is yours: you may use, modify, and
+   distribute that output freely, including in commercial projects, with no
+   obligation to the copyright holder.
+
+3. Restrictions
+   Without the prior written permission of the copyright holder, you may not:
+   copy, redistribute, resell, sublicense, or publish the Software itself;
+   modify, decompile, reverse engineer, or create derivative works of its
+   source code; or remove or alter this notice.
+
+4. Third-party components
+   The Software loads third-party open-source libraries that remain under
+   their own licenses. See THIRD-PARTY-LICENSES.md.
+
+5. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF,
+   OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.

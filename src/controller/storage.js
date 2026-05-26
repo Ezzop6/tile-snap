@@ -211,39 +211,167 @@ export const templates = {
 // without duplication. Collisions are theoretically possible (~1 in 10^16)
 // but treated as errors — `put` throws if a different value already exists
 // at the hash so we never silently overwrite real user data.
+//
+// Image dataURLs are the only storage entries that reach real size (base64
+// PNGs); everything else here is small JSON metadata. They used to live in
+// localStorage and hit Chromium's ~5MB origin cap, so they now persist in
+// IndexedDB (origin quota is orders of magnitude larger) in BOTH the web and
+// desktop builds — one code path, no environment branching.
+//
+// The public API stays SYNCHRONOUS (get/has/put/delete/list) because it's
+// called from sync render + export paths. Every binary is mirrored in an
+// in-memory Map: init() fills it from the backend once at boot, and writes go
+// write-through (Map updated synchronously, backend written fire-and-forget).
+// The only caller change is awaiting images.init() at boot.
+//
+// Fallback: if IndexedDB is unavailable (notably opening index.html over
+// file:// in dev, where Chromium blocks it) init() degrades to the old
+// localStorage backend so the file-based dev workflow doesn't regress.
+
+const IDB_NAME = "tilesetgen";
+const IDB_STORE = "images";
+
+let idbPromise = null;
+function idbOpen() {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return idbPromise;
+}
+
+function idbReq(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+const imageCache = new Map(); // hash -> dataURL; the synchronous read layer
+let imageBackend = "memory";  // "idb" | "localStorage" | "memory" (pre-init)
+let imagesReady = null;       // init() promise (idempotent)
+
+async function persistImagePut(hash, dataURL) {
+  if (imageBackend === "idb") {
+    const db = await idbOpen();
+    await idbReq(db.transaction(IDB_STORE, "readwrite").objectStore(IDB_STORE).put(dataURL, hash));
+  } else if (imageBackend === "localStorage") {
+    localStorage.setItem(KEY_IMAGE(hash), dataURL);
+  }
+}
+
+async function persistImageDelete(hash) {
+  if (imageBackend === "idb") {
+    const db = await idbOpen();
+    await idbReq(db.transaction(IDB_STORE, "readwrite").objectStore(IDB_STORE).delete(hash));
+  } else if (imageBackend === "localStorage") {
+    localStorage.removeItem(KEY_IMAGE(hash));
+  }
+}
+
 export const images = {
+  // Selects the backend, loads every persisted binary into the in-memory
+  // cache, and runs the one-time localStorage -> IndexedDB migration.
+  // Idempotent. MUST be awaited at boot before any project/input hydration so
+  // the synchronous get() used by render + export resolves immediately.
+  init() {
+    if (imagesReady) return imagesReady;
+    imagesReady = (async () => {
+      // IndexedDB is primary (no 5MB cap); localStorage is the fallback when
+      // IDB is missing or blocked (file:// dev).
+      try {
+        if (typeof indexedDB === "undefined") throw new Error("no indexedDB");
+        const db = await idbOpen();
+        imageBackend = "idb";
+        const store = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE);
+        // Issue both requests synchronously on the same transaction BEFORE
+        // awaiting — awaiting between them can let the txn auto-commit and the
+        // second call throw TransactionInactiveError.
+        const keysReq = store.getAllKeys();
+        const valsReq = store.getAll();
+        const keys = await idbReq(keysReq);
+        const vals = await idbReq(valsReq);
+        // getAllKeys() and getAll() both return in ascending key order, so
+        // index i pairs the same record.
+        for (let i = 0; i < keys.length; i++) {
+          if (typeof vals[i] === "string") imageCache.set(String(keys[i]), vals[i]);
+        }
+      } catch (err) {
+        console.warn("[storage] IndexedDB unavailable, falling back to localStorage:", err);
+        imageBackend = "localStorage";
+        idbPromise = null;
+      }
+
+      // localStorage image.* entries: in localStorage mode this IS the load;
+      // in idb mode it's the one-time migration (copy into idb + cache, then
+      // free the localStorage entry).
+      const legacyKeys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(IMAGE_PREFIX)) legacyKeys.push(k);
+      }
+      for (const k of legacyKeys) {
+        const hash = k.slice(IMAGE_PREFIX.length);
+        const dataURL = localStorage.getItem(k);
+        if (typeof dataURL !== "string") continue;
+        if (!imageCache.has(hash)) {
+          imageCache.set(hash, dataURL);
+          if (imageBackend === "idb") {
+            try {
+              await persistImagePut(hash, dataURL);
+            } catch (err) {
+              console.warn(`[storage] migrate image ${hash} -> idb failed:`, err);
+              continue; // keep the localStorage copy as the source of truth
+            }
+          }
+        }
+        if (imageBackend === "idb") localStorage.removeItem(k);
+      }
+    })();
+    return imagesReady;
+  },
+
   get(hash) {
-    return localStorage.getItem(KEY_IMAGE(hash));
+    const v = imageCache.get(hash);
+    return v === undefined ? null : v;
   },
 
   has(hash) {
-    return localStorage.getItem(KEY_IMAGE(hash)) != null;
+    return imageCache.has(hash);
   },
 
   put(hash, dataURL) {
     if (!hash || typeof dataURL !== "string") return;
-    const existing = localStorage.getItem(KEY_IMAGE(hash));
+    const existing = imageCache.get(hash);
     if (existing != null && existing !== dataURL) {
       throw new Error(
         `image hash collision at ${hash} — existing ${existing.length}B differs from new ${dataURL.length}B`,
       );
     }
-    if (existing == null) localStorage.setItem(KEY_IMAGE(hash), dataURL);
+    if (existing != null) return; // identical content already stored
+    imageCache.set(hash, dataURL);
+    // Write-through. IndexedDB quota is large so failures are rare (unlike the
+    // old localStorage 5MB cap); surface them to the console.
+    persistImagePut(hash, dataURL).catch((err) =>
+      console.error(`[storage] persist image ${hash} failed:`, err),
+    );
   },
 
   delete(hash) {
-    localStorage.removeItem(KEY_IMAGE(hash));
+    imageCache.delete(hash);
+    persistImageDelete(hash).catch((err) =>
+      console.error(`[storage] delete image ${hash} failed:`, err),
+    );
   },
 
   list() {
-    const out = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(IMAGE_PREFIX)) {
-        out.push(k.slice(IMAGE_PREFIX.length));
-      }
-    }
-    return out;
+    return [...imageCache.keys()];
   },
 };
 
@@ -352,10 +480,9 @@ export function cleanOrphanImageBinaries() {
   const orphans = findOrphanImageHashes();
   let freed = 0;
   for (const h of orphans) {
-    const k = KEY_IMAGE(h);
-    const v = localStorage.getItem(k);
-    if (v != null) freed += (k.length + v.length) * 2;
-    localStorage.removeItem(k);
+    const v = images.get(h);
+    if (v != null) freed += (KEY_IMAGE(h).length + v.length) * 2;
+    images.delete(h); // Map drop is sync; backend delete is fire-and-forget
   }
   return { count: orphans.length, freedBytes: freed };
 }
@@ -407,13 +534,19 @@ export const settings = {
   },
 };
 
-// Approximate UTF-16 byte usage of the tileset-generator namespace (for quota UI).
+// Approximate UTF-16 byte usage of the tileset-generator namespace (for quota
+// UI). Image binaries now live in IndexedDB rather than localStorage, but they
+// still count toward the user-facing footprint — add the in-memory cache
+// (a mirror of the persisted set) so the figure doesn't collapse to metadata.
 export function storageUsageBytes() {
   let chars = 0;
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith(NS)) continue;
     chars += k.length + (localStorage.getItem(k) || "").length;
+  }
+  for (const [hash, dataURL] of imageCache) {
+    chars += KEY_IMAGE(hash).length + dataURL.length;
   }
   return chars * 2;
 }

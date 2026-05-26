@@ -167,6 +167,12 @@ onModeChange((mode) => {
   else if (mode !== "texture" && inTexture) leaveTextureMode();
 });
 
+// Image binaries live in IndexedDB (no ~5MB localStorage cap). Load them all
+// into the in-memory cache before any project/input hydration so the sync
+// images.get() used by render + export resolves immediately. Awaited up front;
+// degrades to localStorage if IndexedDB is unavailable (file:// dev).
+await images.init();
+
 // Restore settings BEFORE view init so widgets paint with the right initial values.
 applySettingsToState();
 bindSettingsListeners();

@@ -21,6 +21,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
+# App source lives in src/ (root holds only the packaging layer).
+APP="$ROOT/src"
+
 OBFUSCATE="${OBFUSCATE:-none}"
 OUTDIR="${OUTDIR:-dist}"
 DEBUG_BUILD="${DEBUG_BUILD:-false}"
@@ -33,7 +36,7 @@ OBFUSCATOR="javascript-obfuscator@4.2.2"
 HTMLMIN="html-minifier-terser@7.2.0"
 
 TMP="$(mktemp -d)"
-ENTRY_CSS="$ROOT/.build-entry.css"
+ENTRY_CSS="$APP/.build-entry.css"
 trap 'rm -rf "$TMP" "$ENTRY_CSS"' EXIT
 
 echo "▶ build: OBFUSCATE=$OBFUSCATE  DEBUG_BUILD=$DEBUG_BUILD  OUTDIR=$OUTDIR"
@@ -41,7 +44,7 @@ echo "▶ build: OBFUSCATE=$OBFUSCATE  DEBUG_BUILD=$DEBUG_BUILD  OUTDIR=$OUTDIR"
 # --- 1. Bundle + minify JS. Format stays ESM because main.js uses top-level
 #        await (state.loadInputsLibrary); index.html keeps <script type=module>.
 echo "  · bundling JS (esbuild)"
-npx --yes "$ESBUILD" main.js \
+npx --yes "$ESBUILD" "$APP/main.js" \
   --bundle \
   --format=esm \
   --target=es2022 \
@@ -132,7 +135,7 @@ sed \
   -e '\#href="styles/tokens.css"#d' \
   -e "s#href=\"styles/main.css\"#href=\"$CSS_NAME\"#" \
   -e "s#src=\"main.js\"#src=\"$JS_NAME\"#" \
-  index.html > "$TMP/index.html"
+  "$APP/index.html" > "$TMP/index.html"
 
 # Minify the HTML itself — sed only rewrites tags, so without this step every
 # source comment (vendor notes, layout hints) ships verbatim. Conservative
@@ -149,9 +152,9 @@ npx --yes "$HTMLMIN" \
 
 # --- 5b. Ship the first-run demo project. projectBar fetches it on first run
 #         (empty storage) and imports it; it must sit next to index.html.
-if [ -f demo.tilesetproj.json ]; then
+if [ -f "$APP/demo.tilesetproj.json" ]; then
   echo "  · copying demo project"
-  cp demo.tilesetproj.json "$OUTDIR/"
+  cp "$APP/demo.tilesetproj.json" "$OUTDIR/"
 fi
 
 # --- 6. Report.

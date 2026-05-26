@@ -8,9 +8,11 @@ tenhle soubor je teď primární dokumentace.)
 
 ## TL;DR
 
-Browser-only nástroj (jeden `index.html` + JS moduly z CDN) pro generování **vektorových tilesetů**.
-Žádný build step pro vývoj, žádný npm — `index.html` se otevírá přímo. (Opt-in distribuční
-build `make build` existuje jen pro nasazení, netýká se dev — viz "Konvence".)
+Browser-only nástroj (JS moduly z CDN) pro generování **vektorových tilesetů**.
+Žádný build step pro vývoj, žádný npm — `src/index.html` se otevírá přímo. (App zdrojáky
+žijí pod `src/`; root drží packaging vrstvu.) Dvě opt-in distribuční cesty, ani jedna se
+netýká dev: **web build** `make build` → `dist/` a **desktop build** (Electron) `make app-*`
+→ `release/` — viz "Konvence" + "Desktop packaging".
 
 **Účel nástroje (důležité — neztratit kontext):** generovat **artwork pro tileset** který se importuje do Godotu; Godot pak za běhu placuje skutečné dlaždice podle terrain pravidel. **Tool ne-řeší autotile / terrain logiku** (od toho je Godot), pouze produkuje statické zdrojové obrázky. Hlavní use-case = **přechody mezi 2 podklady** (tráva ↔ hlína atp.). Pro to potřebujeme: 2 source textury, transformace (rotate/flip) pro varianty stejného přechodu na různé strany, a **clip masky** definující tvar přechodu.
 
@@ -136,8 +138,14 @@ Nová abstrakční vrstva v `core/pointGraph/` má vlastní pravidla nad rámec 
 
 ### Aktuální stav v repu
 
+> **App zdrojáky se přesunuly pod `src/`** (kvůli Electron packagingu — viz
+> "Desktop packaging"). Strom appky níže (`index.html` … `styles/`) je teď obsah
+> `src/`; popisky a relativní cesty platí beze změny, jen s prefixem `src/`.
+> Root-level packaging soubory (electron-main.cjs, package.json, build.sh,
+> Makefile, …) jsou vypsané na KONCI stromu.
+
 ```
-tileset_generator/
+tileset_generator/   (strom appky níže = obsah src/)
 ├── index.html                 — HTML scaffold (topbar + 3-pane workspace + drop overlay)
 ├── main.js                    — entry: Split.js + settings boot + view wiring + drag&drop router +
 │                                top-level await on state.loadInputsLibrary() + Texture-mode handler
@@ -821,13 +829,26 @@ tileset_generator/
 │   ├── export.css             — Export mode (layout grid, preview, selection frame, variability)
 │   ├── dialog.css             — dialog.js multi-button confirm modal (.dialog__*)
 │   └── projectModal.css       — projectModal.js full-screen project picker (grid rows, pool boxes)
-├── build.sh                   — opt-in DISTRIBUTION build → dist/ (bundle/minify/obfuscate via
-│                                esbuild + javascript-obfuscator + html-minifier-terser, npx-only,
-│                                no package.json). NOT part of dev/run. OBFUSCATE=none|light|heavy.
-├── Makefile                   — distribution build targets: build(=light) / build-min / build-light /
-│                                build-heavy / serve (:8000) / clean. Wraps build.sh.
+│
+│   (↑ vše výše = obsah src/.  ↓ následující jsou ROOT-level, sourozenci src/)
+│
+├── electron-main.cjs          — Electron main proces (desktop wrapper): app:// protokol,
+│                                CDN→vendor rewrite, serves src/. Viz "Desktop packaging".
+├── package.json               — Electron + electron-builder devDeps + build config (output →
+│                                release/). POZOR: porušuje staré "žádný package.json" pravidlo
+│                                — vědomá výjimka packaging vrstvy (viz "Konvence").
+├── package-lock.json          — npm lockfile (Electron vrstva).
+├── build.sh                   — opt-in WEB distribuční build → dist/ (bundle/minify/obfuscate via
+│                                esbuild + javascript-obfuscator + html-minifier-terser, npx-only).
+│                                NOT part of dev/run. Bere zdroj z src/. OBFUSCATE=none|light|heavy.
+├── Makefile                   — build targety. Web: build(=light)/build-min/build-light/build-heavy/
+│                                serve(:8000)/clean (→ dist/, wrappuje build.sh). Desktop: app/
+│                                app-linux/app-win/app-mac/clean-app (→ release/, wrappuje electron-builder).
+├── node_modules/              — Electron vrstva (gitignored).
+├── release/                   — electron-builder výstup: AppImage/.exe/.dmg (gitignored).
+├── dist/                      — web build výstup (gitignored).
 ├── AGENTS.md                  — currently-valid spec (this file). Changes only on user confirm.
-└── scrap.md                   — scratchpad (zatím prázdný)
+└── scrap.md                   — scratchpad (release/licence poznámky)
 ```
 
 ### Right-panel mode visibility — `data-mode` attr
@@ -1203,21 +1224,24 @@ plynulý, s nimi se zasekává.
 
 ## Konvence pro tenhle nástroj
 
-- **Žádný build step pro vývoj/běh.** `index.html` se otevírá přímo, žádná
+- **Žádný build step pro vývoj/běh.** `src/index.html` se otevírá přímo, žádná
   kompilace není potřeba k vývoji ani spuštění. Pokud do DEV workflow někdy
-  přibude build (= kompilace nutná k běhu), je to červená vlajka.
-  - **Výjimka — distribuční build (`make build`):** opt-in release krok čistě
-    pro snadnější přenositelnost, **netýká se vývoje**. `build.sh` + `Makefile`
-    bundlují + minifikují + lehce obfuskují do `dist/` (3 soubory:
-    `index.html` + `app.<hash>.js` + `app.<hash>.css`). JS+CSS přes esbuild,
-    HTML přes html-minifier-terser, JS obfuskace (default `light` = mangled
-    názvy + base64 string-array) přes javascript-obfuscator. **Vendor zůstává
-    z CDN** (Split/paper/simplex/clipper/JSZip), nebundluje se. Nástroje se
-    tahají přes `npx` + cache — **žádný `package.json`, žádné `node_modules`
-    v repu**, dev zůstává build-free. `dist/` je gitignored. Targets:
-    `build` (=light) / `build-min` / `build-light` / `build-heavy` /
-    `serve` (lokální http na :8000) / `clean`. Úroveň obfuskace = env
-    `OBFUSCATE=none|light|heavy` v `build.sh`.
+  přibude build (= kompilace nutná k běhu), je to červená vlajka. App zdrojáky
+  žijí pod `src/`; root drží jen packaging/build vrstvu.
+  - **Web distribuční build (`make build` → `dist/`):** opt-in release krok,
+    **netýká se vývoje**. `build.sh` + `Makefile` bundlují + minifikují + lehce
+    obfuskují do `dist/` (3 soubory: `index.html` + `app.<hash>.js` +
+    `app.<hash>.css`) ze zdroje v `src/`. JS+CSS přes esbuild, HTML přes
+    html-minifier-terser, obfuskace (default `light`) přes javascript-obfuscator.
+    **Vendor zůstává z CDN** (Split/paper/simplex/clipper/JSZip), nebundluje se.
+    Tooling přes `npx` + cache — **tahle cesta nepotřebuje `package.json` ani
+    `node_modules`**. `dist/` gitignored. Obfuskace = env `OBFUSCATE=none|light|heavy`.
+  - **Desktop build (Electron, `make app-*` → `release/`):** opt-in cross-platform
+    binárka (AppImage/.exe/.dmg). **Tahle cesta PORUŠUJE staré "žádný package.json /
+    žádné node_modules" pravidlo** — root má `package.json` (electron +
+    electron-builder devDeps) + `node_modules/`. Vědomá výjimka izolovaná do
+    packaging vrstvy; **dev (`open src/index.html`) i web build zůstávají
+    build-free a bez node_modules**. Detaily v sekci "Desktop packaging".
 - **Žádný framework** (React/Vue/Svelte). Vanilla JS + Paper.js + vlastní UI panely (žádný Tweakpane).
 - **Core = pure functions.** Pokud něco v `core/*` sahá na DOM nebo globální state, je to bug.
 - **Cross-modul komunikace přes StateController events**, ne přímé volání.
@@ -1263,6 +1287,62 @@ Kdykoliv se objeví podobná logika (tlačítko, link, vstupní pole, list item,
 Veškeré barvy, spacing, radii, font sizes definovat jako CSS custom properties v `:root` (např. `--color-bg`, `--color-accent`, `--space-2`, `--radius-sm`, …). Komponenty se na ně odkazují, nepíšou si vlastní hex/px konstanty.
 
 Tím se dá jedním zásahem změnit theme (dark/light) a celý nástroj zůstane konzistentní.
+
+---
+
+## Desktop packaging (Electron)
+
+Druhá opt-in distribuční cesta vedle web buildu — zabalí appku jako nativní
+binárku pro Linux/Win/Mac (cíl: vydání na itch.io). Izolovaná packaging vrstva;
+dev workflow (`open src/index.html`) se nemění.
+
+**Layout:** app zdrojáky žijí v `src/` (index.html, main.js, config.js, core/,
+controller/, view/, styles/, templates/, vendor/, demo.tilesetproj.json). Root
+drží `electron-main.cjs` + `package.json` (electron + electron-builder devDeps +
+build config).
+
+**`electron-main.cjs`** — Electron main proces:
+- Registruje custom `app://` standard+secure protokol. Důvod: ES moduly jsou
+  přes `file://` blokované (CORS) a localStorage potřebuje stabilní origin —
+  `app://` dává oboje.
+- Servíruje z `REPO_ROOT = path.join(app.getAppPath(), "src")` (funguje v devu
+  i uvnitř `app.asar`, protože `src/**` je ve `files`).
+- Při servírování `index.html` za běhu přepisuje 5 jsdelivr CDN `<script src>`
+  na lokální `src/vendor/*` → packaged app je plně offline, **dev index.html
+  zůstává na CDN a nedotčený** (web build to taky nechává na CDN).
+- Loguje renderer chyby (`console-message` ≥ warning / `did-fail-load`) do
+  terminálu — jinak neviditelné bez DevTools.
+
+**Build (`make app-*` nebo `npx electron-builder [--linux|--win|--mac]`):**
+- electron-builder, output → `release/` (NE `dist/` — to vlastní web build).
+- `files: ["electron-main.cjs", "src/**/*"]` → štíhlý asar.
+- Linux AppImage se staví na Linuxu; Win portable z Linuxu chce wine; Mac dmg/zip
+  **jen na macOS** (cross-build nejde). V sandboxu spouštět `npm start -- --no-sandbox`.
+
+**Úložiště:** ponechán localStorage (čistý seam = `controller/storage.js`).
+POZOR: Chromium localStorage je ~5 MB per origin **i v Electronu** — desktop ten
+limit NEzvedá. Pro image-heavy projekty (base64) je to reálný strop; pořádné
+řešení = migrace image binárek na filesystem (odloženo, seam připravený —
+sync API přes load-all-to-memory + write-through, callery se nemění).
+
+**Release roadmap (otevřené body, ne závazek):**
+1. Ověřit zabalený build po přesunu do `src/` (asar path resolution).
+2. Ikona (`build/icon.png` 512²+) — teď defaultní Electron ikona.
+3. Desktop polish: minimální menu + externí odkazy do systémového prohlížeče
+   (`setWindowOpenHandler`), CSP hlavička (zbavit se warningu), pamatování
+   velikosti/pozice okna + min velikost, single-instance lock.
+4. Podpis/notarizace: macOS (Apple Developer ID + notarizace, jinak Gatekeeper
+   blokuje) + Windows (jinak SmartScreen) — **rozhodnutí odloženo**; build držet
+   signing-ready, neblokovat. Bez podpisu shipnout s návodem (Mac right-click →
+   Open / `xattr -cr`).
+5. Licence: `LICENSE` + `THIRD-PARTY-LICENSES.md` (parkované, viz scrap.md) musí
+   pokrýt **i Electron/Chromium**. + About dialog v UI (verze + GitHub odkaz).
+6. CI: GitHub Actions matrix (ubuntu/windows/macos) — **zatím odloženo** (user).
+7. itch.io: upload přes butler + per-platform kanály → auto-update v itch appce
+   (Electron vlastní autoUpdater netřeba).
+
+**Verze:** teď existují DVA version stringy — `config.js#VERSION` (project/export
+JSON, viz "Versioning") + `package.json#version` (binárka). Držet v sync při bumpu.
 
 ---
 
