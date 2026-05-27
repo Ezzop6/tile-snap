@@ -1,6 +1,7 @@
 scrap.txt
 scrap.md
 TODO.md
+verify.md
 
 # transient build artifact (build.sh writes it into src/)
 .build-entry.css
