@@ -31,4 +31,9 @@ export const DEBUG =
 // Bump rules from 1.0 onward: MAJOR for breaking schema changes (consumers
 // must migrate), MINOR for additive schema (new fields with defaults), PATCH
 // for behaviour fixes that don't change the schema.
+//
+// SINGLE SOURCE OF TRUTH = package.json#version. `make version-sync` (a
+// prerequisite of every build) rewrites the literal below to match — bump
+// package.json (or `npm version x.y.z`), don't hand-edit this (a build
+// overwrites it).
 export const VERSION = "0.0.0";

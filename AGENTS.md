@@ -576,6 +576,13 @@ tileset_generator/   (strom appky níže = obsah src/)
 │   │                            document-level keydown listener; modifier-less keys suppressed inside
 │   │                            text inputs but Ctrl+X etc. fire through. Future shortcuts MUST go here
 │   │                            instead of attaching their own listeners.
+│   ├── about.js               — About modal (topbar `ⓘ` #about-toggle, all modes). App name +
+│   │                            config.VERSION + © + itch.io link (external via setWindowOpenHandler)
+│   │                            + open-source attribution list. Reuses `.dialog`/`.about__*` (dialog.css)
+│   │                            with its own root + Esc handler. COMPONENTS = inline data mirroring
+│   │                            THIRD-PARTY-LICENSES.md (NOT fetched — web build ships no vendor/ files).
+│   │                            Closing note is build-aware via `location.protocol === "app:"`: desktop
+│   │                            = bundled texts + Electron/Chromium/FFmpeg; web = CDN, no redistribution.
 │   ├── toast.js               — bottom-right toast notifications (success/info/error).
 │   │                            options.action: {label, onClick} adds a clickable button (gives the
 │   │                            user a fresh user-gesture for fallback downloads etc.); :has() rule
@@ -900,9 +907,13 @@ mainView + mapView + slotEditor + debug stage + export přes jedinou cestu.
   `settings.js#LEGACY_KEYS`.
 - `state.serialize()` returns project-only data (no settings, no image bytes).
   `storageUsageBytes()` aggregates the entire namespace including images.
-  ~5 MB localStorage limit; dedup makes multi-project storage feasible. Storage
-  API is intentionally narrow so it can be swapped to IndexedDB without
-  touching callers.
+  Project/template/settings metadata stays in localStorage (small JSON); the
+  **`images` store moved to IndexedDB** (2026-05-26) to escape the ~5 MB
+  localStorage cap. Its public API stays synchronous (`get/has/put/delete/list`)
+  via an in-memory `Map` mirror filled by `await images.init()` at boot, with
+  IDB write-through and a one-time localStorage→IDB migration; falls back to
+  localStorage if IDB is unavailable (file:// dev). Callers unchanged apart from
+  the boot init. dedup (content-addressed hashes) still applies.
 
 ### Plánovaná struktura (PŮVODNÍ SPEC — superseded)
 
@@ -1313,36 +1324,89 @@ build config).
 - Loguje renderer chyby (`console-message` ≥ warning / `did-fail-load`) do
   terminálu — jinak neviditelné bez DevTools.
 
-**Build (`make app-*` nebo `npx electron-builder [--linux|--win|--mac]`):**
-- electron-builder, output → `release/` (NE `dist/` — to vlastní web build).
+**Build (`make app-*`):** vše pod `release/<target>/` — web → `release/web`,
+desktop → `release/{linux,win,mac}` (Makefile přes `-c.directories.output`;
+package.json default `release` je jen fallback). `dist/` se už nepoužívá.
 - `files: ["electron-main.cjs", "src/**/*"]` → štíhlý asar.
 - Linux AppImage se staví na Linuxu; Win portable z Linuxu chce wine; Mac dmg/zip
   **jen na macOS** (cross-build nejde). V sandboxu spouštět `npm start -- --no-sandbox`.
 
-**Úložiště:** ponechán localStorage (čistý seam = `controller/storage.js`).
-POZOR: Chromium localStorage je ~5 MB per origin **i v Electronu** — desktop ten
-limit NEzvedá. Pro image-heavy projekty (base64) je to reálný strop; pořádné
-řešení = migrace image binárek na filesystem (odloženo, seam připravený —
-sync API přes load-all-to-memory + write-through, callery se nemění).
+**Úložiště:** metadata (projekty/šablony/settings) v localStorage; **image
+binárky v IndexedDB** (2026-05-26) — Chromium localStorage ~5 MB cap platí i v
+Electronu, takže obrázky (base64) by narážely. Seam = `controller/storage.js`
+`images` store: sync API přes in-memory `Map` + IDB write-through, `await
+images.init()` v `main.js` bootu naplní Map + odmigruje legacy localStorage
+`image.*` → IDB. Funguje stejně ve webu i desktopu (oba reálný origin); fallback
+na localStorage když IDB chybí (file:// dev).
+
+**Invarianty (na co pozor — aby se web ⇆ desktop řešily JEDNOTNĚ):**
+Existují dva buildy ze stejného `src/` (web `release/web` přes CDN vendor; desktop
+`release/{platform}` přes bundlovaný `src/vendor`). Tahle pravidla je drží v sync —
+poruš je a buildy se rozejdou:
+1. **CSP žije v `<meta>` v `src/index.html`** (NE jako HTTP header), aby platilo
+   pro OBA buildy z jednoho místa. Každý NOVÝ typ zdroje (script/img/connect/font/
+   worker/media…) musí být přidán do policy, jinak ho prohlížeč zařízne. Striktní:
+   žádný inline `<script>`, žádný `eval`/`new Function`.
+2. **Nová JS závislost = tři místa synchronně:** CDN `<script>` v `src/index.html`
+   + lokální kopie v `src/vendor/` + mapování v `electron-main.cjs#CDN_TO_VENDOR`.
+   A MUSÍ být CSP-safe — žádný `eval`/`new Function` ani při loadu (proto
+   paper-**core** místo paper-full). Ověřit `grep -E "new Function|eval\(" src/vendor/<lib>`.
+   `script-src` povoluje `'self'` (desktop po rewrite) i `cdn.jsdelivr.net` (web).
+3. **Runtime asset (favicon, ikona, příště logo, obrázky) MUSÍ být pod `src/`** —
+   `app://` servíruje jen `src/` (path-traversal guard blokuje sourozence jako
+   `images/`). Pro web navíc `build.sh` musí asset zkopírovat do `release/web`
+   (viz bloky „copying icon/demo"). Asset mimo `src/` desktop nenačte.
+4. **Velké binárky → IndexedDB** (`images` store: sync API + `Map` + `await
+   init()`), NE localStorage (~5 MB cap). Malá metadata zůstávají v localStorage.
+5. **Verze = jeden zdroj `package.json`** → `make version-sync` (prereq buildu)
+   sedne do `config.js#VERSION`. Verzi v `config.js` needitovat ručně.
+6. **Build výstupy `release/{web,linux,win,mac}`** — desktop přes
+   `-c.directories.output`, web přes `OUTDIR`. `dist/` je mrtvý.
+7. **Native menu = jen genuinně funkční role** (clipboard/zoom/fullscreen/window/
+   quit), bez undo/redo. App akce (New/Open/Save, módy) do menu NEpatří —
+   vyžadovaly by IPC most main↔renderer; jsou v topbaru + `view/keyboard.js`.
+   **Nepřidávat menu akcelerátory, co by stínily zkratky z `keyboard.js`** (menu
+   odchytí klávesu dřív než renderer). Edit menu drž i když vypadá zbytečně —
+   na macOS je nutné, aby Cmd+C/V/X/A v polích vůbec fungovaly.
+8. **Obfuskace web buildu (`build.sh` light/heavy) je ověřeně CSP-clean** (nezavádí
+   `eval`/`Function`). Po změně configu obfuskátoru znovu ověřit `grep` ve výstupním
+   bundlu, jinak striktní CSP web build rozbije.
+9. **Dev potřebuje reálný origin** — ES moduly se přes `file://` nenačtou (CORS).
+   Dev = `npm start` (desktop `app://`) nebo `make serve` (web http). Otevřít
+   `index.html` přímo přes `file://` NEfunguje.
 
 **Release roadmap (otevřené body, ne závazek):**
-1. Ověřit zabalený build po přesunu do `src/` (asar path resolution).
-2. Ikona (`build/icon.png` 512²+) — teď defaultní Electron ikona.
-3. Desktop polish: minimální menu + externí odkazy do systémového prohlížeče
-   (`setWindowOpenHandler`), CSP hlavička (zbavit se warningu), pamatování
-   velikosti/pozice okna + min velikost, single-instance lock.
+1. ~~Ověřit zabalený build po přesunu do `src/` (asar path resolution).~~ ✅ HOTOVO 2026-05-26.
+2. ~~Ikona~~ ✅ HOTOVO 2026-05-26: jeden zdroj `src/icon.png` (512²) → favicon
+   (index.html + build.sh kopíruje do release/web), `BrowserWindow.icon`,
+   `package.json#build.icon` (electron-builder generuje platform ikony).
+3. ~~Desktop polish~~ ✅ HOTOVO 2026-05-26: minimální menu + externí odkazy
+   (`setWindowOpenHandler` + `will-navigate`), CSP (jako `<meta>` v `index.html`,
+   pokrývá oba buildy; striktní bez `unsafe-eval` → swap paper-full→paper-core),
+   window state (`userData/window-state.json`) + min 1024×640, single-instance lock.
 4. Podpis/notarizace: macOS (Apple Developer ID + notarizace, jinak Gatekeeper
    blokuje) + Windows (jinak SmartScreen) — **rozhodnutí odloženo**; build držet
    signing-ready, neblokovat. Bez podpisu shipnout s návodem (Mac right-click →
    Open / `xattr -cr`).
-5. Licence: `LICENSE` + `THIRD-PARTY-LICENSES.md` (parkované, viz scrap.md) musí
-   pokrýt **i Electron/Chromium**. + About dialog v UI (verze + GitHub odkaz).
+5. ~~Licence + About dialog~~ ✅ HOTOVO. `LICENSE` + `THIRD-PARTY-LICENSES.md`
+   pokrývají i Electron/Chromium/FFmpeg; texty ověřeny verbatim proti upstreamu
+   (2026-05-27). About dialog (`view/about.js`, topbar `ⓘ`) surfacuje verzi +
+   © + itch.io odkaz + atribuci v UI. Repo zůstává soukromé (closed-source
+   produkt) — About odkazuje na itch stránku, ne na zdroják.
 6. CI: GitHub Actions matrix (ubuntu/windows/macos) — **zatím odloženo** (user).
 7. itch.io: upload přes butler + per-platform kanály → auto-update v itch appce
    (Electron vlastní autoUpdater netřeba).
+8. Interaktivně ověřit CSP+IDB+paper-core build (demo load / upload obrázku /
+   export PNG+zip — cesty `img-src data:/blob:` + IDB perzistence). Boot a render
+   jsou ověřené automaticky, tyhle interakce zatím ne.
+9. Win + Mac buildy zatím nepostavené (ověřený jen Linux AppImage). Při stavbě
+   ověřit electron-builder konverzi `src/icon.png` (512² PNG) → `.ico`/`.icns`
+   (kdyžtak dodat nativní formáty) a že CSP/IDB/menu jedou shodně.
 
-**Verze:** teď existují DVA version stringy — `config.js#VERSION` (project/export
-JSON, viz "Versioning") + `package.json#version` (binárka). Držet v sync při bumpu.
+**Verze:** `package.json#version` je jediný zdroj pravdy. `make version-sync`
+(prereq každého buildu) ho sedne do `config.js#VERSION` (= verze v project/export
+JSON, viz "Versioning"). Bumpni jen package.json (`npm version x.y.z`); config.js
+needitovat ručně (build ho přepíše).
 
 ---
 

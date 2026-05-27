@@ -35,6 +35,7 @@ import {
   requestNew,
 } from "./view/projectBar.js";
 import { openProjectModal } from "./view/projectModal.js";
+import { initAbout } from "./view/about.js";
 import { registerShortcut } from "./view/keyboard.js";
 import { confirmReplaceOrNew } from "./view/dialog.js";
 import {
@@ -198,6 +199,7 @@ initDebugPanel();
 initDebugMode();
 initBundleMode();
 initModeTabs();
+initAbout();
 
 document.getElementById("view-reset")?.addEventListener("click", () => {
   const body = document.body.classList;

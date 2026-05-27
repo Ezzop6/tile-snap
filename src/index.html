@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Content-Security-Policy (defense-in-depth): no inline scripts, no eval
+       (paper-core carries none). Local resources + the jsdelivr CDN for the web
+       build's vendor scripts; the desktop build rewrites those to local
+       vendor/ at serve time, so 'self' alone covers it there. Applies to both
+       builds from this one tag. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'">
   <meta name="viewport" content="width=1024">
   <title>TileSnap</title>
+  <link rel="icon" type="image/png" href="icon.png">
   <link rel="stylesheet" href="styles/tokens.css">
   <link rel="stylesheet" href="styles/main.css">
 </head>
@@ -42,6 +49,7 @@
       <button class="topbar__toggle debug-only" id="trace-toggle" type="button" aria-pressed="false" title="Show / hide the pipeline trace overlay (top-left).">⏱</button>
       <button class="topbar__toggle debug-only" id="trace-record" type="button" aria-pressed="false" title="Start / stop collecting trace timings. Keep recording on while hiding the overlay to inspect what's behind it.">⏺</button>
       <button class="topbar__toggle debug-only" id="trace-copy" type="button" title="Copy the last trace timings to clipboard.">⧉</button>
+      <button class="topbar__toggle topbar__about" id="about-toggle" type="button" title="About TileSnap" aria-label="About TileSnap"><span aria-hidden="true">ⓘ</span></button>
     </div>
   </header>
 
@@ -640,7 +648,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/split.js@1.6/dist/split.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-core.min.js"></script>
   <!-- simplex-noise — used by core/noise.js. v2 accepts a seed string
        directly in its constructor, no separate RNG needed. UMD global:
        `SimplexNoise`. -->

@@ -113,3 +113,87 @@
   background: rgba(176, 64, 64, 0.15);
   color: #ffaaaa;
 }
+
+/* --- About modal (view/about.js) — richer content variant of the box. ----- */
+.dialog__box--about {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.about__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.about__body p { margin: 0; }
+
+.about__version {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.about__copyright { color: var(--color-text-muted); }
+
+.about__links { margin-top: var(--space-1); }
+
+.about__body a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.about__body a:hover { text-decoration: underline; }
+
+.about__licenses {
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.about__licenses > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  user-select: none;
+}
+.about__licenses > summary:hover { color: var(--color-text-strong); }
+
+.about__lic-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.about__lic {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-2);
+  align-items: baseline;
+}
+
+.about__lic > a { font-weight: 600; }
+
+.about__lic-ver {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.about__lic-meta {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.about__licenses .about__lic-note {
+  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}

@@ -2,10 +2,10 @@
 
 TileSnap ships in two forms, which redistribute third-party code differently:
 
-- **Web build** (`make build` → `dist/`): loads the runtime libraries below
+- **Web build** (`make build` → `release/web`): loads the runtime libraries below
   **from a CDN (jsdelivr)** at runtime. It does **not** bundle or redistribute
   their source. The table is here for attribution.
-- **Desktop build** (Electron, `make app-*` → `release/`): **bundles** the
+- **Desktop build** (Electron, `make app-*` → `release/<platform>`): **bundles** the
   runtime libraries (copied into `src/vendor/`) **and** the Electron runtime
   (which embeds Chromium). This form **does redistribute** their code, so the
   full upstream notices travel with it (see "Bundled in the desktop build").
@@ -18,9 +18,9 @@ All third-party components are permissive and cleared for commercial use.
 |---|---|---|---|---|
 | Split.js | 1.6.5 | MIT | © 2020 Nathan Cahill | https://www.npmjs.com/package/split.js · https://github.com/nathancahill/split |
 | Paper.js | 0.12.18 | MIT | © 2011–2020 Jürg Lehni & Jonathan Puckey | https://www.npmjs.com/package/paper · https://github.com/paperjs/paper.js |
-| simplex-noise | 2.4.0 | MIT | © 2018 Jonas Wagner | https://www.npmjs.com/package/simplex-noise · https://github.com/jwagner/simplex-noise.js |
+| simplex-noise | 2.4.0 | MIT | © 2018 Jonas Wagner; incl. bundled alea PRNG © 2010 Johannes Baagøe (MIT) | https://www.npmjs.com/package/simplex-noise · https://github.com/jwagner/simplex-noise.js |
 | clipper-lib | 6.4.2 | BSL-1.0 (Boost) | © 2010–2017 Angus Johnson | https://www.npmjs.com/package/clipper-lib · https://www.boost.org/LICENSE_1_0.txt |
-| JSZip | 3.10.1 | MIT OR GPL-3.0-or-later | © Stuart Knightley & contributors | https://www.npmjs.com/package/jszip · https://github.com/Stuk/jszip |
+| JSZip | 3.10.1 | MIT OR GPL-3.0-or-later | © 2009–2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso | https://www.npmjs.com/package/jszip · https://github.com/Stuk/jszip |
 
 ### JSZip license election
 JSZip is dual-licensed. **TileSnap elects to use JSZip under the MIT license.**
@@ -47,13 +47,14 @@ notice in distributed copies — these files satisfy that for the runtime libs.)
 
 | Component | License (SPDX) | Notes |
 |---|---|---|
-| Electron | MIT | © GitHub Inc. and Electron contributors. https://github.com/electron/electron |
-| Chromium (embedded in Electron) | BSD-3-Clause + many third-party | Notices in `LICENSES.chromium.html` (Node, V8, ffmpeg, ICU, …) |
+| Electron 33.4.11 | MIT | © GitHub Inc. and Electron contributors. https://github.com/electron/electron |
+| Chromium (embedded in Electron) | BSD-3-Clause + many third-party | Notices in `LICENSES.chromium.html` (Node, V8, FFmpeg, ICU, …) |
+| FFmpeg (in Electron, `libffmpeg.so`/`.dll`) | LGPL-2.1-or-later | Electron's default "free" FFmpeg build. **Dynamically linked** as a separate shared library, so it stays user-replaceable — the condition under which LGPL code may ship inside a proprietary host application. Attribution in `LICENSES.chromium.html`. |
 
 `electron-builder` includes Electron's own license and the Chromium notices in
 the packaged output (typically `LICENSE.electron.txt` + `LICENSES.chromium.html`
-alongside the application). Verify these files are present in `release/` before
-publishing.
+alongside the application). Verify these files are present in `release/<platform>/`
+before publishing.
 
 ## Build-time tools (NOT shipped)
 
@@ -66,11 +67,18 @@ product, so they impose no obligations on it. Listed for completeness.
 | esbuild | 0.25.12 | MIT |
 | javascript-obfuscator | 4.2.2 | BSD-2-Clause |
 | html-minifier-terser | 7.2.0 | MIT |
-| electron-builder | 25.x | MIT |
+| electron-builder | 25.1.8 | MIT |
 
 ---
 
 _This file is an attribution summary, not legal advice. Before commercial
 release, confirm the exact copyright lines against each upstream `LICENSE`, and
 confirm Electron's `LICENSE.electron.txt` + `LICENSES.chromium.html` actually
-ship inside `release/`._
+ship inside `release/<platform>/`._
+
+_Verification (2026-05-27): the five bundled runtime-library texts in
+`src/vendor/licenses/` were diffed against canonical upstream for the exact
+shipped versions (Paper.js v0.12.18, Split.js 1.6.5, simplex-noise 2.4.0 —
+including its alea PRNG notice, clipper-lib's Boost-1.0 against boost.org, JSZip
+v3.10.1) and are byte-for-byte faithful (no modifications). Electron/Chromium
+notices confirmed present in `release/linux/linux-unpacked/`._

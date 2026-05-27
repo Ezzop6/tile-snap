@@ -157,6 +157,12 @@ if [ -f "$APP/demo.tilesetproj.json" ]; then
   cp "$APP/demo.tilesetproj.json" "$OUTDIR/"
 fi
 
+# --- 5c. Ship the favicon / app icon (index.html <link rel=icon> references it).
+if [ -f "$APP/icon.png" ]; then
+  echo "  · copying icon"
+  cp "$APP/icon.png" "$OUTDIR/"
+fi
+
 # --- 6. Report.
 echo "✔ done → $OUTDIR/"
 printf '  %-22s %s\n' "$JS_NAME"  "$(du -h "$OUTDIR/$JS_NAME"  | cut -f1)"

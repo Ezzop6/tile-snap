@@ -15,6 +15,7 @@
   "build": {
     "appId": "io.itch.ezzop6.tilesnap",
     "productName": "TileSnap",
+    "icon": "src/icon.png",
     "directories": {
       "output": "release"
     },

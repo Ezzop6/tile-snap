@@ -2,7 +2,30 @@
 
 Pracovní handoff pro desktop packaging TileSnap (Electron → Linux/Win/Mac, cíl
 itch.io). Plná dokumentace je v `AGENTS.md` → sekce **"Desktop packaging"**.
-Větev: `taury-vs-elektron`.
+Větev: `desktop-release` (dřív `taury-vs-elektron`).
+
+---
+
+## Zbývá vyřešit (pro pokračování)
+
+1. ~~**Interaktivně ověřit CSP + IDB + paper-core build na Linuxu**~~ ✅ HOTOVO
+   (2026-05-27, user). Demo / upload / export PNG+ZIP + CSP violations ověřeny dřív
+   (viz `verify.md` → „Už dříve ověřeno"). Doklikány i poslední body `verify.md`
+   sekce A: CSP warning v terminálu chybí + čistý boot, window-state restore drží
+   přes restart, runtime ikona exportovaná (xprop). **Linux je kompletně ověřen.**
+2. **Win + Mac buildy nepostavené / neověřené** — ověřený je jen Linux AppImage.
+   `make app-win` (z Linuxu chce wine), `make app-mac` (JEN na macOS). Při nich
+   ověřit zvlášť: electron-builder konverzi `src/icon.png` (512² PNG) → `.ico`
+   (win) / `.icns` (mac) — pokud neumí z PNG, dodat nativní formáty; a že
+   CSP/IDB/menu jedou stejně jako na Linuxu.
+3. ~~About dialog (UI)~~ ✅ HOTOVO (2026-05-27) — krok 4 níž.
+4. **Rozhodnutí na userovi** — podpis/notarizace, CI, branch reconciliation
+   (sekce „Rozhodnutí čekající na usera" níž).
+5. **Commit** — vše je v pracovním stromu, negitnuto (řeší user).
+
+> Konvence pro jednotné řešení web ⇆ desktop viz `AGENTS.md` → „Invarianty
+> (na co pozor)". Každá nová závislost / asset / storage / CSP změna se musí
+> držet těch pravidel, jinak se buildy rozejdou.
 
 ---
 
@@ -14,9 +37,10 @@ Větev: `taury-vs-elektron`.
   + stabilní origin pro localStorage), servíruje `src/`, za běhu přepisuje CDN
   `<script>` → lokální `src/vendor/*` (offline). Loguje renderer chyby do terminálu.
 - **Vendored knihovny** v `src/vendor/` (offline) — dev `index.html` zůstává na CDN.
-- **Build:** `package.json` build config (electron-builder, output → `release/`,
-  NE `dist/`). Targety pro Linux/Win/Mac. Makefile: `make app-*`.
-- **Web build** (`build.sh`/`make build` → `dist/`) přesměrován na `src/`, funguje.
+- **Build:** `package.json` build config (electron-builder). Výstupy pod
+  `release/<target>/`: desktop → `release/{linux,win,mac}`, web → `release/web`.
+  Targety pro Linux/Win/Mac. Makefile: `make app-*` / `make build`.
+- **Web build** (`build.sh`/`make build` → `release/web`) běží ze `src/`, funguje.
 - **AGENTS.md** aktualizován (src/ layout, Desktop packaging sekce, opravena
   konvence o package.json).
 - **Licence:** `LICENSE` (proprietární, © 2026 ezzop6) + `THIRD-PARTY-LICENSES.md`
@@ -39,52 +63,85 @@ Přebuildováno (`make app-linux`) a spuštěno (`./release/TileSnap-0.0.0.AppIm
 - `release/linux-unpacked/` má `LICENSE.electron.txt` + `LICENSES.chromium.html`.
 - User vizuálně potvrdil: okno se vykreslí, demo projekt se načte, export funguje.
 
-### 2. Desktop polish (kód, většinu zvládnu bez vstupu)
-Vše v `electron-main.cjs`:
-- **Minimální app menu** (default Electron menu má dev věci) + **externí odkazy
-  do systémového prohlížeče** přes `win.webContents.setWindowOpenHandler` +
-  `will-navigate` (kvůli budoucímu About s GitHub odkazem — nesmí otevřít uvnitř okna).
-- **CSP hlavička** — zbavit se security warningu + harden. Vlastníme `app://`
-  handler → přidat `content-security-policy` header do Response (vše je lokální,
-  takže striktní CSP je proveditelná).
-- **Pamatování velikosti/pozice okna** + min velikost (AGENTS zmiňuje min 1024px).
-  Teď fixní 1440×900, nepamatuje se.
-- **Single-instance lock** (`app.requestSingleInstanceLock()`) — dvě okna by si
-  přepisovala localStorage.
+### ~~2. Desktop polish~~ ✅ HOTOVO (2026-05-26)
+Vše v `electron-main.cjs` (+ CSP v `src/index.html`):
+- **Minimální app menu** ✅ — jen genuinně funkční položky: File→Quit,
+  Edit→Cut/Copy/Paste/SelectAll (**bez undo/redo** — app nemá document-level
+  undo, role by jen klamaly), View→zoom/fullscreen, Window, (mac appMenu). Bez
+  reload/devtools. App akce (New/Open/Save, módy) zůstávají v topbaru + klávesách
+  (do menu se necpou — vyžadovalo by IPC most main↔renderer). Ověřeno dumpem menu.
+- **Externí odkazy do systémového prohlížeče** ✅ — `setWindowOpenHandler`
+  (deny + `shell.openExternal` pro http(s)) + `will-navigate` (povolí jen
+  `app://`, zbytek ven). Pro budoucí About → GitHub.
+- **CSP** ✅ — řešeno jako `<meta http-equiv>` v `src/index.html` (NE header), aby
+  pokrylo OBA buildy (web `dist/` nemá `electron-main`). Striktní bez
+  `unsafe-eval` → vyžádalo swap **`paper-full` → `paper-core`** (paper-full volá
+  `new Function` při loadu; app PaperScript nepoužívá). Policy: `script-src
+  'self' https://cdn.jsdelivr.net` (web tahá vendor z CDN, desktop rewrite na
+  self), `img-src 'self' data: blob:`, `style-src 'self' 'unsafe-inline'`.
+  Warning zmizel i v devu. Ověřeno: čistý boot + render, žádné violations.
+- **Pamatování velikosti/pozice/maximized okna** ✅ — `userData/window-state.json`
+  (getNormalBounds + isMaximized), `minWidth 1024` / `minHeight 640`.
+- **Single-instance lock** ✅ — `requestSingleInstanceLock`; druhá instance
+  fokusne první a skončí (ověřeno).
 
-### 3. Ikona
-Čeká na obrázek od usera (512×512+ PNG). Pak doplnit do `build` configu
-(`"icon": "build/icon.png"`); electron-builder vygeneruje platform ikony.
+**Zbývá interaktivně ověřit uživatelem** (headless to neproklikne): demo load,
+upload obrázku (`data:`), export PNG/zip (`blob:`) — kvůli CSP `img-src` cestám.
 
-### 4. About dialog (UI)
-V appce (`src/view/`, použít `dialog.js`): název + `config.VERSION` + © 2026
-ezzop6 + odkaz na GitHub **projekt** + odkazy na licence (`LICENSE` /
-`THIRD-PARTY` / `src/vendor/licenses/`). Plán: malé „ⓘ About" v topbaru u loga.
-**BLOKOVÁNO:** chybí konkrétní **URL repa na GitHubu** (LICENSE teď používá jen
-profil `github.com/ezzop6`). Pozn.: pro čtení licencí přes `app://` zvážit, že
-handler servíruje z `src/` — root `LICENSE` přes `app://` není dosažitelný
-(buď odkaz na GitHub, nebo zkopírovat/zpřístupnit pod `src/`).
+### ~~3. Ikona~~ ✅ HOTOVO (2026-05-26)
+Jeden zdroj **`src/icon.png`** (512², uvnitř `src/` ať je dosažitelný přes
+`app://` pro favicon) použitý třikrát: favicon (`<link rel=icon>` v index.html,
+build.sh ho kopíruje do `release/web`), okno (`BrowserWindow.icon`), zabalená
+app ikona (`package.json#build.icon` → electron-builder generuje platform ikony).
+Ověřeno: electron-builder ho vzal (zmizelo „default Electron icon"), je v asaru,
+čistý boot. **Logo `images/tileSnapLogo.png`** (630×500) zatím nepoužité — až
+půjde do UI (topbar/About), přesunout taky pod `src/` (jinak ho `app://`
+neservíruje).
 
-### 5. Verze v sync
-`config.js#VERSION` (0.0.0) i `package.json#version` (0.0.0) — při každém releasu
-bumpnout **obojí** zároveň.
+### ~~4. About dialog (UI)~~ ✅ HOTOVO (2026-05-27)
+`src/view/about.js` + topbar tlačítko `ⓘ` (`#about-toggle`, vedle loga, ve všech
+módech) + `.about__*` styly v `styles/dialog.css`. Modal: název + `config.VERSION`
++ © 2026 ezzop6 + odkaz na **itch.io stránku** (`https://ezzop6.itch.io/tilesnap`,
+otevře se externě přes `setWindowOpenHandler`) + rozbalovací seznam open-source
+komponent (name/version/license/copyright + upstream odkaz) + závěrečná poznámka
+**build-aware** přes `location.protocol === "app:"` (desktop = zabalené texty +
+Electron/Chromium/FFmpeg; web = CDN, žádná redistribuce — jeden about.js ve
+sdíleném `src/`). Reuse `.dialog` vizuálních tříd, ale vlastní root +
+Esc handler (oddělené od `dialog.js`).
+**Rozhodnutí, proč NE odkaz na GitHub repo:** repo zůstává soukromé (placený
+closed-source produkt; veřejnost neuděluje právo k užití, ale source-available
+podkopává prodej). About proto neukazuje zdroják — produktový odkaz = itch.io.
+**Licence in-app:** atribuce je inline data v `about.js` (NE fetch souborů —
+web build nekopíruje `vendor/`, takže fetch by tam selhal). Plné texty cestují
+zabalené v desktop buildu (`src/vendor/licenses/`) + jsou na upstream odkazech.
+`about.js#COMPONENTS` drž v sync s `THIRD-PARTY-LICENSES.md` (kanonický zdroj).
+
+### ~~5. Verze v sync~~ ✅ HOTOVO (2026-05-26)
+**`package.json#version` je teď jediný zdroj pravdy.** `make version-sync`
+(prereq každého buildu) sedne verzi do `src/config.js#VERSION`. Při releasu bumpni
+jen package.json (nebo `npm version x.y.z`) — config.js se dorovná sám při buildu,
+needitovat ho ručně.
 
 ---
 
 ## Rozhodnutí čekající na usera
 
-- **Podpis / notarizace** (rozhodnutí ODLOŽENO — „rozhodnu později"):
-  - macOS: bez Apple Developer ID ($99/rok) + notarizace → Gatekeeper blokuje
-    („app is damaged"). Buď zaplatit, nebo shipnout s návodem (right-click → Open
-    / `xattr -cr`).
-  - Windows: nepodepsaný → SmartScreen „neznámý vydavatel" (na itch běžně OK).
-  - Build držet signing-ready, neblokovat.
+- ~~**Podpis / notarizace**~~ ✅ ROZHODNUTO (2026-05-27): **NEpodepisovat.**
+  Na itch je nepodepsaný build norma; certy (Apple 99 $/rok, Win OV ~200–400 $/rok
+  + HSM) až bude trakce. Build zůstává signing-ready (electron-builder config jde
+  rozšířit kdykoli). Do `scrap/itch.html` přidána krátká „jak otevřít" poznámka
+  (Win: More info → Run anyway; mac: right-click → Open / `xattr -cr`).
+  - macOS pozn.: nepodepsaná app se NEblokuje jen „varuje" — Gatekeeper ji
+    odmítne hláškou „app is damaged"; návod na stránce je proto na macu nutný.
 - **GitHub Actions CI** — ODLOŽENO. Až bude potřeba spolehlivě stavět Win (bez
   wine) + Mac (bez Macu): matrix workflow ubuntu/windows/macos. macOS runner umí
   i notarizovat přes secrets.
-- **Branch reconciliation** — `THIRD-PARTY` na větvi `license` je zastaralý
-  (nezná desktop); verze v `taury-vs-elektron` ho nahrazuje. Sloučit/cherry-pick
-  je na userovi.
+- ~~**Branch reconciliation**~~ ✅ VYŘEŠENO (2026-05-27): větev `license` je plně
+  redundantní — `LICENSE` identický, její `THIRD-PARTY` je jen starší verze, kterou
+  `desktop-release` nahrazuje. Nic unikátního k záchraně → `git branch -D license`
+  (lokální/nepushnutá, bezpečné). Pracovní větev přejmenována `taury-vs-elektron`
+  → `desktop-release`. Zbývající git akce (smazat license, merge do master, push)
+  jsou na userovi.
 
 ---
 
@@ -94,21 +151,24 @@ bumpnout **obojí** zároveň.
 # DEV (desktop okno)
 npm start                       # v sandboxu: npm start -- --no-sandbox
 
-# DESKTOP build (→ release/)
-make app-linux                  # AppImage (staví se na Linuxu)
-make app-win                    # Windows portable .exe (z Linuxu CHCE wine)
-make app-mac                    # macOS dmg+zip (JEN na macOS)
-make app                        # aktuální platforma
-make clean-app                  # smaže release/
+# DESKTOP build (→ release/<platforma>)
+make app-linux                  # AppImage → release/linux  (staví se na Linuxu)
+make app-win                    # Windows portable .exe → release/win  (z Linuxu CHCE wine)
+make app-mac                    # macOS dmg+zip → release/mac  (JEN na macOS)
+make app                        # aktuální platforma → release/<host>
+make clean-app                  # smaže release/{linux,win,mac}
 
-# WEB build (→ dist/, vendor zůstává CDN)
+# WEB build (→ release/web, vendor zůstává CDN)
 make build                      # = build-light
-make serve                      # build + http server :8000
+make serve                      # build + http server :8000 (servíruje release/web)
+make clean                      # smaže release/web
 ```
 
 ## Gotchas
 
-- **Dva výstupní adresáře:** web → `dist/`, desktop → `release/`. Neslévat.
+- **Build výstupy:** vše pod `release/<target>/` — web → `release/web`, desktop →
+  `release/{linux,win,mac}` (electron-builder přes `-c.directories.output`). Celé
+  `release/` je gitignored. (Dřív web→`dist/`; `dist/` se už nepoužívá.)
 - **localStorage strop ~5 MB — VYŘEŠENO (2026-05-26), přes IndexedDB.** Image
   binárky (jediné objemné entry; zbytek je drobné JSON metadata) přesunuty z
   localStorage do **IndexedDB** (větší origin quota) — v `controller/storage.js`

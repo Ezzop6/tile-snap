@@ -2,10 +2,9 @@ scrap.txt
 scrap.md
 TODO.md
 
-# release build output + transient build artifact
-dist/
+# transient build artifact (build.sh writes it into src/)
 .build-entry.css
 
-# electron desktop wrapper
+# all build output (web → release/web, desktop → release/<platform>)
 node_modules/
 release/
