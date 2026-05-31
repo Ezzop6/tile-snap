@@ -13,11 +13,12 @@ Větev: `desktop-release` (dřív `taury-vs-elektron`).
    (viz `verify.md` → „Už dříve ověřeno"). Doklikány i poslední body `verify.md`
    sekce A: CSP warning v terminálu chybí + čistý boot, window-state restore drží
    přes restart, runtime ikona exportovaná (xprop). **Linux je kompletně ověřen.**
-2. **Win + Mac buildy nepostavené / neověřené** — ověřený je jen Linux AppImage.
-   `make app-win` (z Linuxu chce wine), `make app-mac` (JEN na macOS). Při nich
-   ověřit zvlášť: electron-builder konverzi `src/icon.png` (512² PNG) → `.ico`
-   (win) / `.icns` (mac) — pokud neumí z PNG, dodat nativní formáty; a že
-   CSP/IDB/menu jedou stejně jako na Linuxu.
+2. **Win build POSTAVEN (2026-05-27)** přes Docker (`build-win-docker.sh`,
+   `electronuserland/builder:wine` — systémový wine netřeba): `release/win/TileSnap
+   0.0.0.exe` (portable, x64, ikona zkonvertovaná, bez `default Electron icon`
+   warningu). **Runtime ověření zbývá na reálném Win 10/11** (wine NENÍ věrohodný
+   test) — viz `verify.md` sekce B. **Mac build nepostaven** (chce macOS); při něm
+   ověřit `.icns` konverzi + že CSP/IDB/menu jedou jako na Linuxu.
 3. ~~About dialog (UI)~~ ✅ HOTOVO (2026-05-27) — krok 4 níž.
 4. **Rozhodnutí na userovi** — podpis/notarizace, CI, branch reconciliation
    (sekce „Rozhodnutí čekající na usera" níž).
